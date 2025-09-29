@@ -15,7 +15,7 @@ const io = new Server(server, {
   cors: {
     origin:
       process.env.NODE_ENV === "production"
-        ? "https://bapasjember.somasi.cloud"
+        ? "https://somasi.cloud"
         : "http://localhost:8080",
     credentials: true,
   },
