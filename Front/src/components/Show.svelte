@@ -89,9 +89,7 @@
     };
   }
   
-  // GANTI SELURUH FUNGSI INI DENGAN VERSI DI BAWAH
-
-async function fetchAndAggregateAllData() {
+  async function fetchAndAggregateAllData() {
     const fetchPromises = BAPAS_LIST.map(bapas =>
         fetch(`${bapas.url}/api/dashboard`)
             .then(response => {
@@ -104,7 +102,7 @@ async function fetchAndAggregateAllData() {
 
     const results = await Promise.all(fetchPromises);
 
-    // Inisialisasi agregasi dengan angka 0
+    // Selalu reset agregasi di awal
     let aggregatedStats = {
         jumlahKlienDewasa: 0,
         jumlahHMBBulanIni: 0,
@@ -121,17 +119,9 @@ async function fetchAndAggregateAllData() {
         if (result.status === 'fulfilled') {
             const data = result.value;
 
-            // ========================================================== //
-            // --- INI BAGIAN PERBAIKAN UTAMA ---
-            // Pastikan semua nilai diubah menjadi Angka (Number) sebelum dijumlahkan
-            // untuk menghindari penggabungan teks (string concatenation).
-            // ========================================================== //
-            Object.keys(aggregatedStats).forEach(key => {
-                const statKey = key as keyof typeof aggregatedStats;
-                // Ambil nilai dari API, jika tidak ada, anggap 0.
-                const valueFromApi = data.summary?.[statKey] || 0;
-                // Paksa konversi nilai menjadi Angka sebelum operasi +=
-                aggregatedStats[statKey] += Number(valueFromApi);
+            // Pastikan semua summary di-cast ke number
+            Object.entries(aggregatedStats).forEach(([key]) => {
+                aggregatedStats[key as keyof typeof aggregatedStats] += Number(data.summary?.[key]) || 0;
             });
 
             const aktivitasDariBapasIni = (data.aktivitasTerakhir || []).map((item: any) => ({
@@ -139,7 +129,6 @@ async function fetchAndAggregateAllData() {
             }));
             combinedAktivitasTerakhir.push(...aktivitasDariBapasIni);
 
-            // Bagian ini sudah benar karena sudah menggunakan Number()
             (data.perkembangan || []).forEach((p: any) => {
                 const existing = aggregatedPerkembangan.get(p.tanggal) || { jumlahHMB: 0, jumlahKlienBaru: 0, jumlahKlienDewasa: 0 };
                 existing.jumlahHMB += Number(p.jumlahHMB) || 0;
@@ -148,7 +137,6 @@ async function fetchAndAggregateAllData() {
                 aggregatedPerkembangan.set(p.tanggal, existing);
             });
 
-            // Bagian ini juga sudah benar
             (data.laporanHarian || []).forEach((h: any) => {
                 const existingCount = aggregatedLaporanHarian.get(h._id) || 0;
                 aggregatedLaporanHarian.set(h._id, existingCount + (Number(h.jumlah) || 0));
