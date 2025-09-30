@@ -89,77 +89,117 @@
     };
   }
   
-  // GANTI SELURUH FUNGSI INI
-async function fetchDashboardData() {
-    if (!loading) loading = true;
-    
+  async function fetchAndAggregateAllData() {
     const fetchPromises = BAPAS_LIST.map(bapas =>
         fetch(`${bapas.url}/api/dashboard`)
-        .then(response => {
-            if (!response.ok) throw new Error(`Gagal memuat dari ${bapas.name}`);
-            return response.json();
-        })
-        .then(data => ({ name: bapas.name, status: 'fulfilled', value: data }))
-        .catch(error => ({ name: bapas.name, status: 'rejected', reason: error.toString() }))
+            .then(response => {
+                if (!response.ok) throw new Error(`Gagal memuat dari ${bapas.name}`);
+                return response.json();
+            })
+            .then(data => ({ name: bapas.name, status: 'fulfilled', value: data }))
+            .catch(error => ({ name: bapas.name, status: 'rejected', reason: error.toString() }))
     );
 
     const results = await Promise.all(fetchPromises);
-    
-    let aggregatedStats = { jumlahKlienDewasa: 0, jumlahHMBBulanIni: 0, jumlahHMBTahunIni: 0, jumlahKlienBaruTahunIni: 0, jumlahKlienBaruBulanIni: 0 };
+
+    // Selalu reset agregasi di awal
+    let aggregatedStats = {
+        jumlahKlienDewasa: 0,
+        jumlahHMBBulanIni: 0,
+        jumlahHMBTahunIni: 0,
+        jumlahKlienBaruTahunIni: 0,
+        jumlahKlienBaruBulanIni: 0
+    };
+
     let aggregatedPerkembangan = new Map<string, { jumlahHMB: number, jumlahKlienBaru: number, jumlahKlienDewasa: number }>();
     let aggregatedLaporanHarian = new Map<string, number>();
     let combinedAktivitasTerakhir: any[] = [];
-
-    bapasStatus = results.map(result => {
+    
+    const newBapasStatus = results.map(result => {
         if (result.status === 'fulfilled') {
             const data = result.value;
-            Object.keys(aggregatedStats).forEach(key => { aggregatedStats[key] += data.summary[key] || 0; });
-            
-            // Perbaikan: Sisipkan `namaBapas` ke setiap item aktivitas terakhir
-            const aktivitasDariBapasIni = data.aktivitasTerakhir.map(item => ({
-                ...item,
-                namaBapas: result.name 
+
+            // Pastikan semua summary di-cast ke number
+            Object.entries(aggregatedStats).forEach(([key]) => {
+                aggregatedStats[key as keyof typeof aggregatedStats] += Number(data.summary?.[key]) || 0;
+            });
+
+            const aktivitasDariBapasIni = (data.aktivitasTerakhir || []).map((item: any) => ({
+                ...item, namaBapas: result.name
             }));
             combinedAktivitasTerakhir.push(...aktivitasDariBapasIni);
-            
-            data.perkembangan.forEach(p => {
+
+            (data.perkembangan || []).forEach((p: any) => {
                 const existing = aggregatedPerkembangan.get(p.tanggal) || { jumlahHMB: 0, jumlahKlienBaru: 0, jumlahKlienDewasa: 0 };
-                existing.jumlahHMB += p.jumlahHMB || 0;
-                existing.jumlahKlienBaru += p.jumlahKlienBaru || 0;
-                existing.jumlahKlienDewasa += p.jumlahKlienDewasa || 0;
+                existing.jumlahHMB += Number(p.jumlahHMB) || 0;
+                existing.jumlahKlienBaru += Number(p.jumlahKlienBaru) || 0;
+                existing.jumlahKlienDewasa += Number(p.jumlahKlienDewasa) || 0;
                 aggregatedPerkembangan.set(p.tanggal, existing);
             });
 
-            data.laporanHarian.forEach(h => {
+            (data.laporanHarian || []).forEach((h: any) => {
                 const existingCount = aggregatedLaporanHarian.get(h._id) || 0;
-                aggregatedLaporanHarian.set(h._id, existingCount + h.jumlah);
+                aggregatedLaporanHarian.set(h._id, existingCount + (Number(h.jumlah) || 0));
             });
-            
-            return { name: result.name, status: 'Online' };
+
+            return { name: result.name, status: 'Online' as const };
         } else {
-            return { name: result.name, status: 'Offline' };
+            return { name: result.name, status: 'Offline' as const };
         }
     });
-    
-    stats = aggregatedStats;
-    
-    const finalPerkembangan = Array.from(aggregatedPerkembangan.entries()).map(([tanggal, values]) => ({ tanggal, ...values })).sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
-    const finalLaporanHarian = Array.from(aggregatedLaporanHarian.entries()).map(([_id, jumlah]) => ({ _id, jumlah })).sort((a, b) => new Date(a._id).getTime() - new Date(b._id).getTime());
+
+    const finalPerkembangan = Array.from(aggregatedPerkembangan.entries())
+        .map(([tanggal, values]) => ({ tanggal, ...values }))
+        .sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
+
+    const finalLaporanHarian = Array.from(aggregatedLaporanHarian.entries())
+        .map(([_id, jumlah]) => ({ _id, jumlah }))
+        .sort((a, b) => new Date(a._id).getTime() - new Date(b._id).getTime());
 
     combinedAktivitasTerakhir.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    
-    // Sekarang item.namaBapas sudah terdefinisi
-    aktivitasTerbaru = combinedAktivitasTerakhir.slice(0, 10).map(item => ({
+
+    const finalAktivitas = combinedAktivitasTerakhir.slice(0, 10).map(item => ({
         nama: `${item.Nama} (${item.namaBapas})`,
         waktu: new Date(item.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
         jenis: 'Wajib Lapor'
     }));
+    
+    // Kembalikan semua data yang sudah diproses
+    return {
+        aggregatedStats,
+        finalPerkembangan,
+        finalLaporanHarian,
+        finalAktivitas,
+        newBapasStatus
+    };
+}
 
-    perkembangan = finalPerkembangan;
-    processDataForCharts(finalPerkembangan);
-    processDataForDailyReportsChart(finalLaporanHarian);
 
-    loading = false;
+
+
+
+  // GANTI SELURUH FUNGSI INI
+  async function fetchDashboardData() {
+    if (!loading) loading = true;
+    error = "";
+    try {
+        const data = await fetchAndAggregateAllData();
+
+        // Update semua state Svelte dari data yang diterima
+        stats = data.aggregatedStats;
+        perkembangan = data.finalPerkembangan;
+        aktivitasTerbaru = data.finalAktivitas;
+        bapasStatus = data.newBapasStatus;
+
+        // Proses data untuk grafik
+        processDataForCharts(data.finalPerkembangan);
+        processDataForDailyReportsChart(data.finalLaporanHarian);
+
+    } catch (e: any) {
+        error = "Terjadi kesalahan saat mengambil data gabungan: " + e.message;
+    } finally {
+        loading = false;
+    }
 }
 
   function formatDate(date: Date): string { return date.toLocaleDateString("en-CA"); }
@@ -245,8 +285,8 @@ async function fetchDashboardData() {
 }
   function handleDateSelect(event: CustomEvent<Date>) { selectedDate = event.detail; fetchLocationsForMap(formatDate(event.detail)); }
 
-  onMount(async () => {
-    // 1. Ambil data awal
+    onMount(async () => {
+    // 1. Ambil data awal (ini akan menampilkan spinner)
     await fetchDashboardData();
 
     // 2. Inisialisasi Grafik
@@ -271,16 +311,33 @@ async function fetchDashboardData() {
         const socket = io(bapas.url, { transports: ["websocket"] });
         socket.on("connect", () => console.log(`Connected to Socket.IO at ${bapas.name}`));
         socket.on("disconnect", () => console.log(`Disconnected from Socket.IO at ${bapas.name}`));
-        socket.on("laporan_baru", (laporanBaru) => {
+        socket.on("laporan_baru", async (laporanBaru) => { // <-- Jadikan async
             lastNotification = { ...laporanBaru, namaBapas: bapas.name };
             setTimeout(() => (lastNotification = null), 5000);
-            const aktivitasBaru = {
-                nama: `${laporanBaru.Nama} (${bapas.name})`,
-                waktu: new Date(laporanBaru.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-                jenis: 'Wajib Lapor'
-            };
-            aktivitasTerbaru = [aktivitasBaru, ...aktivitasTerbaru].slice(0, 10);
-            fetchDashboardData(); 
+
+            // LANGKAH 3: Panggil fungsi inti TANPA mengubah 'loading'
+            // Ini akan refresh data di latar belakang.
+            try {
+                const data = await fetchAndAggregateAllData();
+                
+                // Update semua state Svelte. Reaktivitas akan menangani sisanya.
+                stats = data.aggregatedStats;
+                perkembangan = data.finalPerkembangan;
+                aktivitasTerbaru = data.finalAktivitas;
+                bapasStatus = data.newBapasStatus;
+
+                // Proses data baru untuk grafik
+                processDataForCharts(data.finalPerkembangan);
+                processDataForDailyReportsChart(data.finalLaporanHarian);
+                
+                // Blok reaktif `$: ... .update()` akan otomatis mengupdate chart
+                
+            } catch (e) {
+                console.error("Gagal refresh data via socket:", e);
+                // Mungkin tampilkan notifikasi error kecil di sini
+            }
+
+            // Refresh peta jika laporan baru ada di tanggal yang sedang dipilih
             if (formatDate(new Date(laporanBaru.timestamp)) === formatDate(selectedDate)) {
                 fetchLocationsForMap(formatDate(selectedDate));
             }
