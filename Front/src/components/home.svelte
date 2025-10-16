@@ -86,16 +86,16 @@
     { name: 'Bapas Pamekasan', url: 'https://bapaspamekasan.somasi.cloud' },
   ];
 
-  // --- BARU: Palet Warna untuk Setiap Bapas ---
+  // --- Palet Warna untuk Setiap Bapas ---
   const BAPAS_COLORS = {
-    'Bapas Jember': '#1e47d9', // Merah
-    'Bapas Surabaya': '#d91eaa', // Biru Tua
-    'Bapas Malang': '#5fde77', // Biru Sedang
-    'Bapas Madiun': '#c305ed', // Off-white (butuh border) -> Ganti ke warna lain yang lebih kelihatan
-    'Bapas Bojonegoro': '#E9C46A', // Kuning
-    'Bapas Kediri': '#2A9D8F', // Hijau Tosca
-    'Bapas Pamekasan': '#F4A261', // Oranye
-    'Default': '#A8DADC' // Warna fallback
+    'Bapas Jember': '#1e47d9',
+    'Bapas Surabaya': '#d91eaa',
+    'Bapas Malang': '#5fde77',
+    'Bapas Madiun': '#c305ed',
+    'Bapas Bojonegoro': '#E9C46A',
+    'Bapas Kediri': '#2A9D8F',
+    'Bapas Pamekasan': '#F4A261',
+    'Default': '#A8DADC'
   };
 
   // --- STATE MANAGEMENT ---
@@ -113,7 +113,11 @@
   // --- STATE PETA ---
   let map: L.Map;
   let mapMarkers: L.Marker[] = [];
-  let selectedDate = new Date();
+  // --- PERUBAHAN: Menggunakan state terpisah untuk bulan dan tahun ---
+  let selectedMonth: number = new Date().getMonth(); // 0 for January, 11 for December
+  let selectedYear: number = new Date().getFullYear();
+  const availableYears = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
+
 
   // --- VARIABEL GRAFIK ---
   let lineCanvas: HTMLCanvasElement;
@@ -258,7 +262,7 @@
   // --- FUNGSI PETA YANG DIMODIFIKASI ---
 
   function getDaysInMonth(year: number, month: number): number {
-    return new Date(year, month, 0).getDate();
+    return new Date(year, month + 1, 0).getDate();
   }
 
   function formatApiDate(date: Date): string {
@@ -272,18 +276,15 @@
     mapMarkers = []; 
   }
 
-  async function fetchLocationsForMap(selectedDate: Date) {
-    const year = selectedDate.getFullYear();
-    const month = selectedDate.getMonth() + 1;
-
-    console.log(`[PETA] Memulai fetch untuk seluruh bulan: ${month}/${year}`);
+  async function fetchLocationsForMap(month: number, year: number) {
+    console.log(`[PETA] Memulai fetch untuk seluruh bulan: ${month + 1}/${year}`);
     clearMapMarkers();
 
     const daysInMonth = getDaysInMonth(year, month);
     const allFetchPromises = [];
 
     for (let day = 1; day <= daysInMonth; day++) {
-      const dateForDay = new Date(year, month - 1, day);
+      const dateForDay = new Date(year, month, day);
       const dateString = formatApiDate(dateForDay);
       const dailyPromises = BAPAS_LIST.map(bapas =>
         fetch(`${bapas.url}/api/search-wajib-lapor-by-date?date=${dateString}`)
@@ -328,27 +329,23 @@
       
       validCoordsCount++;
       
-      // --- BARU: Logika untuk membuat ikon berwarna ---
       const bapasName = item.namaBapas;
       const color = BAPAS_COLORS[bapasName] || BAPAS_COLORS['Default'];
 
-      // Membuat SVG sebagai string
       const svgIconHtml = `
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32">
           <path fill="${color}" stroke="#FFFFFF" stroke-width="1.5" d="M12 0C7.31 0 3.5 3.81 3.5 8.5c0 5.25 8.5 15.5 8.5 15.5s8.5-10.25 8.5-15.5C20.5 3.81 16.69 0 12 0zm0 11.5a3 3 0 110-6 3 3 0 010 6z"/>
         </svg>`;
 
-      // Menggunakan L.divIcon untuk menampilkan HTML/SVG
       const icon = L.divIcon({
         html: svgIconHtml,
-        className: '', // Kosongkan className agar tidak ada style default
+        className: '',
         iconSize: [32, 32],
-        iconAnchor: [16, 32], // Titik bawah tengah dari ikon
-        popupAnchor: [0, -32] // Posisi popup relatif ke iconAnchor
+        iconAnchor: [16, 32],
+        popupAnchor: [0, -32]
       });
-      // --- AKHIR Logika Ikon ---
       
-      const marker = L.marker([lat, lng], { icon }); // Gunakan ikon kustom
+      const marker = L.marker([lat, lng], { icon });
       const fullPhotoPath = `${item.bapasUrl}${item.photoPath}`; 
       const popupContent = `<div style="font-family: sans-serif; font-size: 14px; max-width: 250px;"><strong style="font-size: 16px;">${item.Nama}</strong><em style="display: block; font-size: 12px; color: #555;">(${item.namaBapas})</em><hr style="margin: 4px 0;"><strong>Alamat:</strong> ${item.Alamat}<br><strong>Pasal:</strong> ${item.Pasal}<br><strong>Nama PK:</strong> ${item.NamaPK}<br><a href="${fullPhotoPath}" target="_blank" rel="noopener noreferrer"><img src="${fullPhotoPath}" alt="Foto Wajib Lapor" style="width: 100%; height: auto; margin-top: 8px; border-radius: 4px;"></a></div>`;
       marker.bindPopup(popupContent);
@@ -366,9 +363,9 @@
     }
   }
 
-  function handleDateSelect(event: CustomEvent<Date>) { 
-    selectedDate = event.detail; 
-    fetchLocationsForMap(selectedDate); 
+  // --- PERUBAHAN: Handler baru untuk UI bulan/tahun ---
+  function handleMonthYearChange() {
+    fetchLocationsForMap(selectedMonth, selectedYear);
   }
 
   onMount(async () => {
@@ -385,7 +382,6 @@
         map = L.map("map").setView([-7.5666, 112.7521], 7.5);
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
         
-        // --- BARU: Menambahkan Legenda ke Peta ---
         const legend = L.control({ position: 'bottomright' });
         legend.onAdd = function (map) {
             const div = L.DomUtil.create('div', 'info legend');
@@ -409,9 +405,9 @@
             return div;
         };
         legend.addTo(map);
-        // --- AKHIR Legenda ---
 
-        await fetchLocationsForMap(selectedDate);
+        // --- PERUBAHAN: Panggilan awal menggunakan state bulan/tahun ---
+        await fetchLocationsForMap(selectedMonth, selectedYear);
       }
     }, 0);
     
@@ -435,9 +431,10 @@
                 console.error("Gagal refresh data via socket:", e);
             }
 
+            // --- PERUBAHAN: Logika refresh menggunakan state bulan/tahun ---
             const newReportDate = new Date(laporanBaru.timestamp);
-            if (newReportDate.getMonth() === selectedDate.getMonth() && newReportDate.getFullYear() === selectedDate.getFullYear()) {
-                fetchLocationsForMap(selectedDate);
+            if (newReportDate.getMonth() === selectedMonth && newReportDate.getFullYear() === selectedYear) {
+                fetchLocationsForMap(selectedMonth, selectedYear);
             }
         });
         return socket;
@@ -623,8 +620,27 @@
           <div class="lg:col-span-2 bg-white p-4 rounded-xl shadow-md">
             <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
                 <h3 class="text-lg font-bold text-gray-700">Peta Wajib Lapor Gabungan Bulanan</h3>
-                <div class="w-full sm:w-56">
-                    <Datepicker bind:value={selectedDate} on:select={handleDateSelect} />
+                <!-- --- PERUBAHAN: Mengganti Datepicker dengan Dropdown Bulan & Tahun --- -->
+                <div class="flex gap-2">
+                  <select bind:value={selectedMonth} on:change={handleMonthYearChange} class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    <option value="0">Januari</option>
+                    <option value="1">Februari</option>
+                    <option value="2">Maret</option>
+                    <option value="3">April</option>
+                    <option value="4">Mei</option>
+                    <option value="5">Juni</option>
+                    <option value="6">Juli</option>
+                    <option value="7">Agustus</option>
+                    <option value="8">September</option>
+                    <option value="9">Oktober</option>
+                    <option value="10">November</option>
+                    <option value="11">Desember</option>
+                  </select>
+                  <select bind:value={selectedYear} on:change={handleMonthYearChange} class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    {#each availableYears as year}
+                      <option value={year}>{year}</option>
+                    {/each}
+                  </select>
                 </div>
             </div>
             <div id="map" class="h-96 lg:h-[32rem] rounded-lg z-0"></div>
