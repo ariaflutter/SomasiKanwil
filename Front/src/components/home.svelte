@@ -50,7 +50,17 @@
     }
 
     // --- Fetch data konfigurasi (instanceName) ---
-    
+    try {
+      const response = await fetch(`/api/config`);
+      if (!response.ok) {
+        throw new Error(`Gagal mengambil data config: ${response.statusText}`);
+      }
+      const config = await response.json();
+      instanceName = config.instanceName;
+    } catch (error) {
+      console.error('Tidak dapat mengambil konfigurasi instansi:', error);
+      // Biarkan instanceName menggunakan nilai default jika fetch gagal
+    }
   });
 
   // Fungsi untuk scroll ke section tertentu dengan smooth
@@ -75,6 +85,18 @@
     { name: 'Bapas Kediri', url: 'https://bapaskediri.somasi.cloud' },
     { name: 'Bapas Pamekasan', url: 'https://bapaspamekasan.somasi.cloud' },
   ];
+
+  // --- BARU: Palet Warna untuk Setiap Bapas ---
+  const BAPAS_COLORS = {
+    'Bapas Jember': '#1e47d9', // Merah
+    'Bapas Surabaya': '#d91eaa', // Biru Tua
+    'Bapas Malang': '#5fde77', // Biru Sedang
+    'Bapas Madiun': '#c305ed', // Off-white (butuh border) -> Ganti ke warna lain yang lebih kelihatan
+    'Bapas Bojonegoro': '#E9C46A', // Kuning
+    'Bapas Kediri': '#2A9D8F', // Hijau Tosca
+    'Bapas Pamekasan': '#F4A261', // Oranye
+    'Default': '#A8DADC' // Warna fallback
+  };
 
   // --- STATE MANAGEMENT ---
   let stats: any = {};
@@ -154,7 +176,6 @@
 
     const results = await Promise.all(fetchPromises);
 
-    // Selalu reset agregasi di awal
     let aggregatedStats = {
         jumlahKlienDewasa: 0,
         jumlahHMBBulanIni: 0,
@@ -170,17 +191,13 @@
     const newBapasStatus = results.map(result => {
         if (result.status === 'fulfilled') {
             const data = result.value;
-
-            // Pastikan semua summary di-cast ke number
             Object.entries(aggregatedStats).forEach(([key]) => {
                 aggregatedStats[key as keyof typeof aggregatedStats] += Number(data.summary?.[key]) || 0;
             });
-
             const aktivitasDariBapasIni = (data.aktivitasTerakhir || []).map((item: any) => ({
                 ...item, namaBapas: result.name
             }));
             combinedAktivitasTerakhir.push(...aktivitasDariBapasIni);
-
             (data.perkembangan || []).forEach((p: any) => {
                 const existing = aggregatedPerkembangan.get(p.tanggal) || { jumlahHMB: 0, jumlahKlienBaru: 0, jumlahKlienDewasa: 0 };
                 existing.jumlahHMB += Number(p.jumlahHMB) || 0;
@@ -188,12 +205,10 @@
                 existing.jumlahKlienDewasa += Number(p.jumlahKlienDewasa) || 0;
                 aggregatedPerkembangan.set(p.tanggal, existing);
             });
-
             (data.laporanHarian || []).forEach((h: any) => {
                 const existingCount = aggregatedLaporanHarian.get(h._id) || 0;
                 aggregatedLaporanHarian.set(h._id, existingCount + (Number(h.jumlah) || 0));
             });
-
             return { name: result.name, status: 'Online' as const };
         } else {
             return { name: result.name, status: 'Offline' as const };
@@ -203,20 +218,16 @@
     const finalPerkembangan = Array.from(aggregatedPerkembangan.entries())
         .map(([tanggal, values]) => ({ tanggal, ...values }))
         .sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
-
     const finalLaporanHarian = Array.from(aggregatedLaporanHarian.entries())
         .map(([_id, jumlah]) => ({ _id, jumlah }))
         .sort((a, b) => new Date(a._id).getTime() - new Date(b._id).getTime());
-
     combinedAktivitasTerakhir.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
     const finalAktivitas = combinedAktivitasTerakhir.slice(0, 10).map(item => ({
         nama: `${item.Nama} (${item.namaBapas})`,
         waktu: new Date(item.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
         jenis: 'Wajib Lapor'
     }));
     
-    // Kembalikan semua data yang sudah diproses
     return {
         aggregatedStats,
         finalPerkembangan,
@@ -231,17 +242,12 @@
     error = "";
     try {
         const data = await fetchAndAggregateAllData();
-
-        // Update semua state Svelte dari data yang diterima
         stats = data.aggregatedStats;
         perkembangan = data.finalPerkembangan;
         aktivitasTerbaru = data.finalAktivitas;
         bapasStatus = data.newBapasStatus;
-
-        // Proses data untuk grafik
         processDataForCharts(data.finalPerkembangan);
         processDataForDailyReportsChart(data.finalLaporanHarian);
-
     } catch (e: any) {
         error = "Terjadi kesalahan saat mengambil data gabungan: " + e.message;
     } finally {
@@ -251,13 +257,10 @@
 
   // --- FUNGSI PETA YANG DIMODIFIKASI ---
 
-  // Helper function to get the number of days in a given month and year
   function getDaysInMonth(year: number, month: number): number {
-    // The month in the Date object is 0-indexed (Jan=0), so we use the provided month directly
     return new Date(year, month, 0).getDate();
   }
 
-  // Helper function to format a Date object into "YYYY-MM-DD" for the API call
   function formatApiDate(date: Date): string {
     return date.toLocaleDateString("en-CA");
   }
@@ -269,39 +272,33 @@
     mapMarkers = []; 
   }
 
-  // This function now fetches data for the entire month of the given date
   async function fetchLocationsForMap(selectedDate: Date) {
     const year = selectedDate.getFullYear();
-    const month = selectedDate.getMonth() + 1; // getMonth() is 0-11, we need 1-12
+    const month = selectedDate.getMonth() + 1;
 
     console.log(`[PETA] Memulai fetch untuk seluruh bulan: ${month}/${year}`);
-    clearMapMarkers(); // Clear the map before starting a new fetch
+    clearMapMarkers();
 
     const daysInMonth = getDaysInMonth(year, month);
     const allFetchPromises = [];
 
-    // 1. Prepare all fetch promises for each day in the month & each BAPAS
     for (let day = 1; day <= daysInMonth; day++) {
-      // The month in new Date() is 0-indexed, so we subtract 1
       const dateForDay = new Date(year, month - 1, day);
-      const dateString = formatApiDate(dateForDay); // Format to "YYYY-MM-DD"
-
+      const dateString = formatApiDate(dateForDay);
       const dailyPromises = BAPAS_LIST.map(bapas =>
         fetch(`${bapas.url}/api/search-wajib-lapor-by-date?date=${dateString}`)
           .then(res => res.ok ? res.json() : [])
           .then(data => data.map(item => ({ ...item, namaBapas: bapas.name, bapasUrl: bapas.url })))
           .catch(err => {
             console.error(`Gagal fetch untuk ${bapas.name} pada ${dateString}:`, err);
-            return []; // Return an empty array on error to not fail the entire process
+            return [];
           })
       );
       allFetchPromises.push(...dailyPromises);
     }
 
-    // 2. Execute all promises in parallel
     const results = await Promise.allSettled(allFetchPromises);
     
-    // 3. Combine all successfully fetched data
     const successfulResults = results
       .filter(result => result.status === 'fulfilled' && result.value.length > 0)
       .map(result => result.value);
@@ -314,7 +311,6 @@
       return;
     }
 
-    // 4. Process and display markers (this logic remains the same)
     let validCoordsCount = 0;
     let invalidCoordsCount = 0;
 
@@ -332,13 +328,27 @@
       
       validCoordsCount++;
       
-      const icon = L.icon({
-          iconUrl: 'https://unpkg.com/leaflet@1.9.3/dist/images/marker-icon.png',
-          shadowUrl: 'https://unpkg.com/leaflet@1.9.3/dist/images/marker-shadow.png',
-          iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+      // --- BARU: Logika untuk membuat ikon berwarna ---
+      const bapasName = item.namaBapas;
+      const color = BAPAS_COLORS[bapasName] || BAPAS_COLORS['Default'];
+
+      // Membuat SVG sebagai string
+      const svgIconHtml = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32">
+          <path fill="${color}" stroke="#FFFFFF" stroke-width="1.5" d="M12 0C7.31 0 3.5 3.81 3.5 8.5c0 5.25 8.5 15.5 8.5 15.5s8.5-10.25 8.5-15.5C20.5 3.81 16.69 0 12 0zm0 11.5a3 3 0 110-6 3 3 0 010 6z"/>
+        </svg>`;
+
+      // Menggunakan L.divIcon untuk menampilkan HTML/SVG
+      const icon = L.divIcon({
+        html: svgIconHtml,
+        className: '', // Kosongkan className agar tidak ada style default
+        iconSize: [32, 32],
+        iconAnchor: [16, 32], // Titik bawah tengah dari ikon
+        popupAnchor: [0, -32] // Posisi popup relatif ke iconAnchor
       });
+      // --- AKHIR Logika Ikon ---
       
-      const marker = L.marker([lat, lng], { icon });
+      const marker = L.marker([lat, lng], { icon }); // Gunakan ikon kustom
       const fullPhotoPath = `${item.bapasUrl}${item.photoPath}`; 
       const popupContent = `<div style="font-family: sans-serif; font-size: 14px; max-width: 250px;"><strong style="font-size: 16px;">${item.Nama}</strong><em style="display: block; font-size: 12px; color: #555;">(${item.namaBapas})</em><hr style="margin: 4px 0;"><strong>Alamat:</strong> ${item.Alamat}<br><strong>Pasal:</strong> ${item.Pasal}<br><strong>Nama PK:</strong> ${item.NamaPK}<br><a href="${fullPhotoPath}" target="_blank" rel="noopener noreferrer"><img src="${fullPhotoPath}" alt="Foto Wajib Lapor" style="width: 100%; height: auto; margin-top: 8px; border-radius: 4px;"></a></div>`;
       marker.bindPopup(popupContent);
@@ -356,59 +366,75 @@
     }
   }
 
-  // This function now passes the full Date object to the fetch function
   function handleDateSelect(event: CustomEvent<Date>) { 
     selectedDate = event.detail; 
     fetchLocationsForMap(selectedDate); 
   }
 
   onMount(async () => {
-    // 1. Ambil data awal (ini akan menampilkan spinner)
     await fetchDashboardData();
 
-    // 2. Inisialisasi Grafik
     if (!error) {
       if (lineCanvas) lineChartInstance = new Chart(lineCanvas, { type: 'line', data: lineChartData, options: lineChartOptions });
       if (monthlyTrendsCanvas) monthlyTrendsInstance = new Chart(monthlyTrendsCanvas, { type: 'bar', data: monthlyTrendsData, options: barChartOptions });
       if (dailyReportsCanvas) dailyReportsInstance = new Chart(dailyReportsCanvas, { type: 'bar', data: dailyReportsData, options: dailyReportsOptions });
     }
     
-    // 3. Inisialisasi Peta
     setTimeout(async () => {
       if (document.getElementById('map') && !map) {
         map = L.map("map").setView([-7.5666, 112.7521], 7.5);
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
-        // Initial map load will fetch data for the current month
+        
+        // --- BARU: Menambahkan Legenda ke Peta ---
+        const legend = L.control({ position: 'bottomright' });
+        legend.onAdd = function (map) {
+            const div = L.DomUtil.create('div', 'info legend');
+            div.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+            div.style.padding = '10px';
+            div.style.borderRadius = '5px';
+            div.style.boxShadow = '0 0 15px rgba(0,0,0,0.2)';
+            
+            let labels = ['<strong>Legenda Bapas</strong>'];
+            for (const bapasName in BAPAS_COLORS) {
+                if (bapasName !== 'Default') {
+                  labels.push(
+                      `<div style="display: flex; align-items: center; margin-top: 5px;">
+                         <i style="background:${BAPAS_COLORS[bapasName]}; width: 18px; height: 18px; border-radius: 50%; margin-right: 8px;"></i>
+                         ${bapasName.replace('Bapas ', '')}
+                       </div>`
+                  );
+                }
+            }
+            div.innerHTML = labels.join('');
+            return div;
+        };
+        legend.addTo(map);
+        // --- AKHIR Legenda ---
+
         await fetchLocationsForMap(selectedDate);
       }
     }, 0);
     
-    // 4. Setup Timer dan Socket.IO
     timer = setInterval(() => { currentTime = new Date(); }, 1000);
     const sockets = BAPAS_LIST.map(bapas => {
         const socket = io(bapas.url, { transports: ["websocket"] });
         socket.on("connect", () => console.log(`Connected to Socket.IO at ${bapas.name}`));
         socket.on("disconnect", () => console.log(`Disconnected from Socket.IO at ${bapas.name}`));
-        socket.on("laporan_baru", async (laporanBaru) => { // <-- Jadikan async
+        socket.on("laporan_baru", async (laporanBaru) => {
             lastNotification = { ...laporanBaru, namaBapas: bapas.name };
             setTimeout(() => (lastNotification = null), 5000);
-
             try {
                 const data = await fetchAndAggregateAllData();
-                
                 stats = data.aggregatedStats;
                 perkembangan = data.finalPerkembangan;
                 aktivitasTerbaru = data.finalAktivitas;
                 bapasStatus = data.newBapasStatus;
-
                 processDataForCharts(data.finalPerkembangan);
                 processDataForDailyReportsChart(data.finalLaporanHarian);
-                
             } catch (e) {
                 console.error("Gagal refresh data via socket:", e);
             }
 
-            // Refresh the map if the new report is in the currently selected month
             const newReportDate = new Date(laporanBaru.timestamp);
             if (newReportDate.getMonth() === selectedDate.getMonth() && newReportDate.getFullYear() === selectedDate.getFullYear()) {
                 fetchLocationsForMap(selectedDate);
@@ -417,7 +443,6 @@
         return socket;
     });
 
-    // 5. Cleanup
     return () => {
       lineChartInstance?.destroy();
       monthlyTrendsInstance?.destroy();
@@ -428,7 +453,6 @@
     };
   });
   
-  // Blok reaktif
   $: if (lineChartInstance && lineChartData) { lineChartInstance.data = lineChartData; lineChartInstance.update(); }
   $: if (monthlyTrendsInstance && monthlyTrendsData) { monthlyTrendsInstance.data = monthlyTrendsData; monthlyTrendsInstance.update(); }
   $: if (dailyReportsInstance && dailyReportsData) { dailyReportsInstance.data = dailyReportsData; dailyReportsInstance.update(); }
@@ -437,31 +461,24 @@
 
 <!-- 
   Struktur Utama Halaman
-  Nav dan BotNav berada di luar container scroll utama 
-  agar posisinya tetap (fixed).
 -->
 <div class="h-screen w-screen flex flex-col">
   <Nav />
 
   <!-- Container Utama yang bisa di-scroll -->
   <main class="flex-grow overflow-y-auto scroll-smooth">
-    <!-- 
-      SECTION 1: HERO IMAGE (Tampilan Penuh Pertama)
-    -->
+    <!-- SECTION 1: HERO IMAGE -->
     <section
       id="hero"
       class="h-[40vh] w-full relative flex items-center justify-center snap-start"
     >
-      <!-- Background Image -->
       <div
         class="absolute inset-0 bg-cover bg-center z-0"
         style="background-image: url('https://asset.kompas.com/crops/FJylOb_m0VcZP6BxDpBqj02O0w8=/0x0:750x500/750x500/data/photo/2022/02/16/620ca77c7763a.jpg');"
       >
-        <!-- Overlay gelap agar teks lebih mudah dibaca -->
         <div class="absolute inset-0 bg-black opacity-90"></div>
       </div>
 
-      <!-- Konten di atas background -->
       <div class="relative z-10 text-left text-white px-4">
         <Heading
           tag="h1"
@@ -479,7 +496,6 @@
         </P>
       </div>
 
-      <!-- Tombol Scroll ke Bawah -->
       <button
         on:click={() => scrollTo('#berita')}
         class="absolute bottom-10 z-10 text-white animate-bounce"
@@ -489,9 +505,7 @@
       </button>
     </section>
 
-    <!-- 
-      SECTION 2: BERITA (Tampilan Penuh Kedua)
-    -->
+    <!-- SECTION 2: BAPAS LIST -->
     <section
       id="berita"
       class=" w-full bg-white dark:bg-gray-900 flex flex-col items-center justify-center snap-start p-4 pt-10 pb-10"
@@ -534,117 +548,116 @@
       </div>
     </section>
 
-    <!-- 
-      SECTION 3: PENJELASAN (Tampilan Penuh Ketiga)
-    -->
+    <!-- SECTION 3: DASHBOARD -->
     
     <section class="w-full   flex flex-col p-10">
       {#if lastNotification}
-  <div class="fixed top-20 right-5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-5 py-3 rounded-xl shadow-lg z-[1000] animate-bounce">
-    <p class="font-bold">📢 Laporan Baru dari {lastNotification.namaBapas}!</p>
-    <p class="text-sm">{lastNotification.Nama} baru saja melapor.</p>
-  </div>
-{/if}
-
-
-  <!-- Header Halaman -->
-  <header class="flex flex-wrap justify-between items-center mb-6 gap-4">
-    <div>
-      <Heading tag="h1" class="text-3xl font-extrabold text-gray-800 dark:text-white">Dashboard Analitik Kanwil</Heading>
-      <P class="text-gray-500 dark:text-gray-400 italic">Analisis data gabungan seluruh Bapas secara live.</P>
-    </div>
-    <div class="flex items-center space-x-3 bg-white dark:bg-gray-800 p-2 rounded-lg shadow-sm">
-      <div class="h-5 w-px bg-gray-300 dark:bg-gray-600"></div>
-      <p class="text-sm font-mono text-gray-900 dark:text-white tracking-tighter">
-        {currentTime.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })} | {currentTime.toLocaleTimeString('en-GB')}
-      </p>
-    </div>
-  </header>
-
-  {#if loading}
-    <div class="flex justify-center items-center h-[calc(100vh-10rem)]">
-      <Spinner size="10" color="blue" />
-      <span class="ml-4 text-lg text-gray-600 dark:text-gray-300">Menggabungkan data dari 7 Bapas...</span>
-    </div>
-  {:else if error}
-    <p class="text-red-500 text-center p-10 bg-red-50 rounded-lg">{error}</p>
-  {:else}
-    <!-- Baris 1: Kartu Statistik Utama -->
-    <section class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-      <Card class="p-4 border-l-4 border-blue-500"><h5 class="text-sm font-semibold text-blue-800">Total Klien Dewasa</h5><p class="text-4xl font-extrabold text-blue-900">{stats.jumlahKlienDewasa}</p></Card>
-      <Card class="p-4 border-l-4 border-green-500"><h5 class="text-sm font-semibold text-green-800">Total HMB Bulan Ini</h5><p class="text-4xl font-extrabold text-green-900">{stats.jumlahHMBBulanIni}</p></Card>
-      <Card class="p-4 border-l-4 border-emerald-500"><h5 class="text-sm font-semibold text-emerald-800">Total HMB Tahun Ini</h5><p class="text-4xl font-extrabold text-emerald-900">{stats.jumlahHMBTahunIni}</p></Card>
-      <Card class="p-4 border-l-4 border-purple-500"><h5 class="text-sm font-semibold text-purple-800">Total Klien Baru Thn. Ini</h5><p class="text-4xl font-extrabold text-purple-900">{stats.jumlahKlienBaruTahunIni}</p></Card>
-      <Card class="p-4 border-l-4 border-pink-500"><h5 class="text-sm font-semibold text-pink-800">Total Klien Baru Bln. Ini</h5><p class="text-4xl font-extrabold text-pink-900">{stats.jumlahKlienBaruBulanIni}</p></Card>
-    </section>
-    
-    <!-- Baris 2: Status Koneksi Bapas -->
-    <section class="mb-6">
-      <h3 class="text-xl font-bold text-gray-800 dark:text-white mb-4">Status Koneksi Bapas</h3>
-      <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-        {#each bapasStatus as bapas}
-          <div class="p-4 rounded-lg text-center shadow-md"
-              class:bg-green-100={bapas.status === 'Online'}
-              class:dark:bg-green-900={bapas.status === 'Online'}
-              class:bg-red-100={bapas.status === 'Offline'}
-              class:dark:bg-red-900={bapas.status === 'Offline'}
-              class:bg-gray-100={bapas.status === 'Loading'}
-              class:dark:bg-gray-700={bapas.status === 'Loading'}>
-            <p class="font-semibold text-gray-800 dark:text-gray-100 truncate">{bapas.name.replace('Bapas Kelas I ', '').replace('Bapas Kelas II ', '')}</p>
-            {#if bapas.status === 'Loading'}
-                <Spinner size="4" color="gray" class="mx-auto mt-1"/>
-            {:else}
-                <Badge color={bapas.status === 'Online' ? 'green' : 'red'} class="mt-1">{bapas.status}</Badge>
-            {/if}
-          </div>
-        {/each}
-      </div>
-    </section>
-    
-    <!-- Baris 3: Grid untuk 2 Grafik Utama -->
-    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-      <div class="bg-white p-4 rounded-xl shadow-md"><div class="h-80"><canvas bind:this={lineCanvas}></canvas></div></div>
-      <div class="bg-white p-4 rounded-xl shadow-md"><div class="h-80"><canvas bind:this={dailyReportsCanvas}></canvas></div></div>
-    </section>
-    
-    <!-- Baris 4: Peta dan Panel Kanan -->
-    <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div class="lg:col-span-2 bg-white p-4 rounded-xl shadow-md">
-        <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
-            <h3 class="text-lg font-bold text-gray-700">Peta Wajib Lapor Gabungan Bulanan</h3>
-            <div class="w-full sm:w-56">
-                <Datepicker bind:value={selectedDate} on:select={handleDateSelect} />
-            </div>
+        <div class="fixed top-20 right-5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-5 py-3 rounded-xl shadow-lg z-[1000] animate-bounce">
+          <p class="font-bold">📢 Laporan Baru dari {lastNotification.namaBapas}!</p>
+          <p class="text-sm">{lastNotification.Nama} baru saja melapor.</p>
         </div>
-        <div id="map" class="h-96 lg:h-[32rem] rounded-lg z-0"></div>
-      </div>
+      {/if}
 
-      <div class="flex flex-col gap-6">
-        <div class="bg-white p-4 rounded-xl shadow-md flex-1">
-          <div class="h-64"><canvas bind:this={monthlyTrendsCanvas}></canvas></div>
+      <!-- Header Halaman -->
+      <header class="flex flex-wrap justify-between items-center mb-6 gap-4">
+        <div>
+          <Heading tag="h1" class="text-3xl font-extrabold text-gray-800 dark:text-white">Dashboard Analitik Kanwil</Heading>
+          <P class="text-gray-500 dark:text-gray-400 italic">Analisis data gabungan seluruh Bapas secara live.</P>
         </div>
-        <div class="bg-white p-4 rounded-xl shadow-md">
-          <h3 class="text-lg font-bold text-gray-700 mb-3">Aktivitas Terbaru (Gabungan)</h3>
-          <div class="space-y-2 max-h-48 overflow-y-auto pr-2">
-            {#if aktivitasTerbaru.length === 0}
-              <p class="text-sm text-gray-500 italic">Belum ada aktivitas terbaru...</p>
-            {/if}
-            {#each aktivitasTerbaru as item (item.waktu + item.nama)}
-              <div class="flex justify-between items-center text-sm p-2 rounded-lg hover:bg-gray-50">
-                <span class="font-semibold text-gray-800 truncate" title={item.nama}>{item.nama}</span>
-                <div class="flex items-center gap-2 flex-shrink-0">
-                  <span class="text-xs font-mono text-gray-500">{item.waktu}</span>
-                  <Badge color="blue">{item.jenis}</Badge>
-                </div>
+        <div class="flex items-center space-x-3 bg-white dark:bg-gray-800 p-2 rounded-lg shadow-sm">
+          <div class="h-5 w-px bg-gray-300 dark:bg-gray-600"></div>
+          <p class="text-sm font-mono text-gray-900 dark:text-white tracking-tighter">
+            {currentTime.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })} | {currentTime.toLocaleTimeString('en-GB')}
+          </p>
+        </div>
+      </header>
+
+      {#if loading}
+        <div class="flex justify-center items-center h-[calc(100vh-10rem)]">
+          <Spinner size="10" color="blue" />
+          <span class="ml-4 text-lg text-gray-600 dark:text-gray-300">Menggabungkan data dari 7 Bapas...</span>
+        </div>
+      {:else if error}
+        <p class="text-red-500 text-center p-10 bg-red-50 rounded-lg">{error}</p>
+      {:else}
+        <!-- Baris 1: Kartu Statistik Utama -->
+        <section class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+          <Card class="p-4 border-l-4 border-blue-500"><h5 class="text-sm font-semibold text-blue-800">Total Klien Dewasa</h5><p class="text-4xl font-extrabold text-blue-900">{stats.jumlahKlienDewasa}</p></Card>
+          <Card class="p-4 border-l-4 border-green-500"><h5 class="text-sm font-semibold text-green-800">Total HMB Bulan Ini</h5><p class="text-4xl font-extrabold text-green-900">{stats.jumlahHMBBulanIni}</p></Card>
+          <Card class="p-4 border-l-4 border-emerald-500"><h5 class="text-sm font-semibold text-emerald-800">Total HMB Tahun Ini</h5><p class="text-4xl font-extrabold text-emerald-900">{stats.jumlahHMBTahunIni}</p></Card>
+          <Card class="p-4 border-l-4 border-purple-500"><h5 class="text-sm font-semibold text-purple-800">Total Klien Baru Thn. Ini</h5><p class="text-4xl font-extrabold text-purple-900">{stats.jumlahKlienBaruTahunIni}</p></Card>
+          <Card class="p-4 border-l-4 border-pink-500"><h5 class="text-sm font-semibold text-pink-800">Total Klien Baru Bln. Ini</h5><p class="text-4xl font-extrabold text-pink-900">{stats.jumlahKlienBaruBulanIni}</p></Card>
+        </section>
+        
+        <!-- Baris 2: Status Koneksi Bapas -->
+        <section class="mb-6">
+          <h3 class="text-xl font-bold text-gray-800 dark:text-white mb-4">Status Koneksi Bapas</h3>
+          <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+            {#each bapasStatus as bapas}
+              <div class="p-4 rounded-lg text-center shadow-md"
+                  class:bg-green-100={bapas.status === 'Online'}
+                  class:dark:bg-green-900={bapas.status === 'Online'}
+                  class:bg-red-100={bapas.status === 'Offline'}
+                  class:dark:bg-red-900={bapas.status === 'Offline'}
+                  class:bg-gray-100={bapas.status === 'Loading'}
+                  class:dark:bg-gray-700={bapas.status === 'Loading'}>
+                <p class="font-semibold text-gray-800 dark:text-gray-100 truncate">{bapas.name.replace('Bapas Kelas I ', '').replace('Bapas Kelas II ', '')}</p>
+                {#if bapas.status === 'Loading'}
+                    <Spinner size="4" color="gray" class="mx-auto mt-1"/>
+                {:else}
+                    <Badge color={bapas.status === 'Online' ? 'green' : 'red'} class="mt-1">{bapas.status}</Badge>
+                {/if}
               </div>
             {/each}
           </div>
-        </div>
-      </div>
-    </section>
-  {/if}
+        </section>
+        
+        <!-- Baris 3: Grid untuk 2 Grafik Utama -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <div class="bg-white p-4 rounded-xl shadow-md"><div class="h-80"><canvas bind:this={lineCanvas}></canvas></div></div>
+          <div class="bg-white p-4 rounded-xl shadow-md"><div class="h-80"><canvas bind:this={dailyReportsCanvas}></canvas></div></div>
+        </section>
+        
+        <!-- Baris 4: Peta dan Panel Kanan -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-2 bg-white p-4 rounded-xl shadow-md">
+            <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
+                <h3 class="text-lg font-bold text-gray-700">Peta Wajib Lapor Gabungan Bulanan</h3>
+                <div class="w-full sm:w-56">
+                    <Datepicker bind:value={selectedDate} on:select={handleDateSelect} />
+                </div>
+            </div>
+            <div id="map" class="h-96 lg:h-[32rem] rounded-lg z-0"></div>
+          </div>
+
+          <div class="flex flex-col gap-6">
+            <div class="bg-white p-4 rounded-xl shadow-md flex-1">
+              <div class="h-64"><canvas bind:this={monthlyTrendsCanvas}></canvas></div>
+            </div>
+            <div class="bg-white p-4 rounded-xl shadow-md">
+              <h3 class="text-lg font-bold text-gray-700 mb-3">Aktivitas Terbaru (Gabungan)</h3>
+              <div class="space-y-2 max-h-48 overflow-y-auto pr-2">
+                {#if aktivitasTerbaru.length === 0}
+                  <p class="text-sm text-gray-500 italic">Belum ada aktivitas terbaru...</p>
+                {/if}
+                {#each aktivitasTerbaru as item (item.waktu + item.nama)}
+                  <div class="flex justify-between items-center text-sm p-2 rounded-lg hover:bg-gray-50">
+                    <span class="font-semibold text-gray-800 truncate" title={item.nama}>{item.nama}</span>
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                      <span class="text-xs font-mono text-gray-500">{item.waktu}</span>
+                      <Badge color="blue">{item.jenis}</Badge>
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            </div>
+          </div>
+        </section>
+      {/if}
 
     </section>
+    
+    <!-- SECTION 4: PENJELASAN -->
     <section
       id="penjelasan"
       class="h-full w-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center snap-start text-center p-4"
@@ -670,10 +683,11 @@
       </div>
     </section>
   </main>
-
-
 </div>
 
 <style>
-
+/* Optional: Style for the legend */
+.leaflet-control.legend {
+    line-height: 1.4;
+}
 </style>
