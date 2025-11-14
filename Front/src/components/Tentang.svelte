@@ -76,7 +76,7 @@
     </figure>
 
     <p>
-      Somasi hadir untuk mempermudah Pengguna Layanan dan Pegawai di seluruh
+      Aksara (Aplikasi Kendali dan Supervisi Klien Pemasyarakatan) hadir untuk mempermudah Pengguna Layanan dan Pegawai di seluruh
       Balai Pemasyarakatan di Kantor Wilayah Jawa Timur dalam melaksanakan kegiatan
       administrasi yang lebih komprehensif dan modern, demi terwujudnya tata kelola
       data dan implementasi core business pemasyarakatan yang unggul.
@@ -90,7 +90,7 @@
     </p>
     <br /><br />
     <p>
-      Somasi dirancang untuk dapat terintegrasi dengan berbagai sistem administrasi
+      Aksara dirancang untuk dapat terintegrasi dengan berbagai sistem administrasi
       internal yang ada di masing-masing Bapas, memungkinkan standarisasi dan
       kualitas data yang lebih baik untuk pelaporan yang cepat dan akurat sesuai
       kebutuhan dinamis organisasi.
@@ -130,7 +130,7 @@
         Lebih Modern</svelte:fragment
       >
       <svelte:fragment slot="paragraph"
-        >Somasi V2 hadir untuk memberikan layanan yang lebih baik kepada seluruh
+        >Aksara hadir untuk memberikan layanan yang lebih baik kepada seluruh
         pengguna layanan di Kantor Wilayah Jawa Timur, mendukung reformasi
         birokrasi dan transparansi layanan di lingkup Kementerian Hukum dan HAM.</svelte:fragment
       >
@@ -172,7 +172,7 @@
         >
         <svelte:fragment slot="h3">Terintegrasi</svelte:fragment>
         <svelte:fragment slot="paragraph"
-          >Somasi dirancang untuk terintegrasi dengan berbagai sistem data
+          >Aksara dirancang untuk terintegrasi dengan berbagai sistem data
           internal, seperti Kuro, Kawa, dan lainnya yang digunakan di Bapas
           se-Jawa Timur untuk menciptakan sumber data yang terpadu.</svelte:fragment
         >
@@ -194,17 +194,17 @@
     <div class="p-4 xl:px-4">
       <FaqItem>
         <svelte:fragment slot="h3"
-          >Mengapa Harus Menggunakan Somasi?</svelte:fragment
+          >Mengapa Harus Menggunakan Aksara?</svelte:fragment
         >
         <p class="text-gray-500 dark:text-gray-400">
-          Somasi memberikan kemudahan bagi para pimpinan di tingkat wilayah maupun
+          Aksara memberikan kemudahan bagi para pimpinan di tingkat wilayah maupun
           satuan kerja untuk memonitor dan menganalisis data dari seluruh Balai
           Pemasyarakatan di Jawa Timur secara efisien.
         </p>
       </FaqItem>
       <FaqItem>
         <svelte:fragment slot="h3"
-          >Apa Saja yang dibutuhkan untuk mengakses Somasi?</svelte:fragment
+          >Apa Saja yang dibutuhkan untuk mengakses Aksara?</svelte:fragment
         >
         <p class="text-gray-500 dark:text-gray-400">
           Sebagai pengguna layanan, Anda mungkin perlu memberikan izin akses
@@ -227,10 +227,10 @@
       </FaqItem>
       <FaqItem>
         <svelte:fragment slot="h3"
-          >Seperti Apa Perkembangan Somasi di Masa Depan?</svelte:fragment
+          >Seperti Apa Perkembangan Aksara di Masa Depan?</svelte:fragment
         >
         <p class="text-gray-500 dark:text-gray-400">
-          Somasi akan terus dikembangkan seiring dengan kebutuhan Direktorat
+          Aksara akan terus dikembangkan seiring dengan kebutuhan Direktorat
           Jenderal Pemasyarakatan dan Kementerian Hukum dan HAM untuk menyajikan
           dan mengelola data secara realtime sesuai dengan kebutuhan organisasi.
         </p>
@@ -275,7 +275,7 @@
       <p
         class="font-light text-gray-500 lg:mb-16 sm:text-xl dark:text-gray-400 p-4 xl:px-4 rounded-3xl"
       >
-        Temui Developer di balik Platform Somasi
+        Temui Developer di balik Platform Aksara
       </p>
     </TeamHeader>
     <TeamBody class="text-center rounded-full p-4 xl:px-4">

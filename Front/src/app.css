@@ -3,8 +3,8 @@
 @import "tailwindcss/utilities";
 
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.6;
   font-weight: 400;
 
   color-scheme: light dark;
@@ -15,15 +15,24 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Custom colors for Aksara branding */
+  --aksara-primary: #2563eb;
+  --aksara-primary-dark: #1d4ed8;
+  --aksara-secondary: #0891b2;
+  --aksara-accent: #7c3aed;
+  --aksara-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
 a {
   font-weight: 500;
-  color: #646cff;
+  color: var(--aksara-primary);
   text-decoration: inherit;
+  transition: all 0.3s ease;
 }
 a:hover {
-  color: #535bf2;
+  color: var(--aksara-primary-dark);
+  transform: translateY(-1px);
 }
 
 body {
@@ -79,9 +88,68 @@ button:focus-visible {
     background-color: #ffffff;
   }
   a:hover {
-    color: #747bff;
+    color: var(--aksara-primary);
   }
   button {
     background-color: #f9f9f9;
   }
+}
+
+/* Custom animations and styles for Aksara */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .5;
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+.aksara-gradient {
+  background: var(--aksara-gradient);
+}
+
+.aksara-shadow {
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.aksara-card {
+  @apply bg-white dark:bg-gray-800 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1;
+}
+
+.aksara-button {
+  @apply bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1;
+}
+
+/* Enhanced scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
 }

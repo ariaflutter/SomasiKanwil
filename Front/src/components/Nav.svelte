@@ -52,16 +52,16 @@
 <SpeedDial defaultClass="absolute end-6 bottom-20 fixed"><DarkMode /></SpeedDial
 >
 <div class="relative px-8 pb-20">
-  <Navbar class="px-2 sm:px-4 py-2.5 fixed w-full z-20 top-0 start-0 border-b">
+  <Navbar class="px-2 sm:px-4 py-2.5 fixed w-full z-20 top-0 start-0 border-b bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
     <NavBrand href="/">
       <img
         src="../Logo.png"
         class="me-3 h-6 sm:h-9"
-        alt="Somasi Logo"
+        alt="Aksara Logo"
       />
       <span
-        class="self-center whitespace-nowrap dark:text-white text-sm text-primary-600"
-        >Somasi {instanceName}</span
+        class="self-center whitespace-nowrap dark:text-white text-sm text-primary-600 font-semibold"
+        >Aksara {instanceName}</span
       >
     </NavBrand>
     <DarkMode class="hidden" />

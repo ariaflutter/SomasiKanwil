@@ -20,8 +20,8 @@
 
 <Footer footerType="socialmedia">
     <div class="mx-auto max-w-screen-xl text-center pb-20">
-      <FooterBrand href="/" src="../Logo.png" alt="Somasi Logo" name="Somasi Bapas Jember" aClass="flex justify-center items-center text-2xl font-semibold text-gray-900 dark:text-white" />
-      <p class="my-6 text-gray-500 dark:text-gray-400">Sistem Informasi Inovasi Layanan Balai Pemasyarakatan Kelas II Jember</p>
+      <FooterBrand href="/" src="../Logo.png" alt="Aksara Logo" name="Aksara Bapas Jember" aClass="flex justify-center items-center text-2xl font-semibold text-gray-900 dark:text-white" />
+      <p class="my-6 text-gray-500 dark:text-gray-400">Aplikasi Kendali dan Supervisi Klien Pemasyarakatan - Sistem Informasi Inovasi Layanan Balai Pemasyarakatan Kelas II Jember</p>
       <FooterLinkGroup ulClass="flex flex-wrap justify-center items-center mb-6 text-gray-900 dark:text-white">
         <FooterLink liClass="" aClass="mr-4 hover:underline md:mr-6 text-primary-600" href="/">Tentang</FooterLink>
         <FooterLink liClass="" aClass="mr-4 hover:underline md:mr-6 text-primary-600" href="/">Reformasi Birokrasi</FooterLink>

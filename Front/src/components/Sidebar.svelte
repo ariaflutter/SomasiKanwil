@@ -32,7 +32,7 @@
       >
         <img src="../Logo.png" class="h-8" alt="Logo" />
         <span class="font-semibold text-md dark:text-white"
-          >Somasi Kanwil Jatim</span
+          >Aksara Kanwil Jatim</span
         >
       </a>
 

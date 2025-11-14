@@ -7,13 +7,13 @@
 </script>
 
 <Nav />
-<h2 class="text-4xl font-extrabold  md:text-5xl lg:text-6xl p-8">Tata Cara Penggunaan Aplikasi Somasi</h2>
+<h2 class="text-4xl font-extrabold  md:text-5xl lg:text-6xl p-8">Tata Cara Penggunaan Aplikasi Aksara</h2>
 <div class="grid grid-cols-1 xl:grid-cols-2 p-8 shadow-sm">
   <div class="p-8 shadow-xl rounded-3xl m-8 ">
     <DeviceMockup >
       <img src="/1.png" class="dark:hidden w-[272px] h-[572px]" alt="default example 1" />
     </DeviceMockup>
-    <h2 class="text-gray-500 sm:text-xl dark:text-gray-400 text-center p-4">"Buka Aplikasi Somasi Bapas Jember dan akan Masuk ke dalam Halaman Utama seperti ini"</h2>
+    <h2 class="text-gray-500 sm:text-xl dark:text-gray-400 text-center p-4">"Buka Aplikasi Aksara Bapas Jember dan akan Masuk ke dalam Halaman Utama seperti ini"</h2>
   </div>
   <div class="p-8 shadow-xl rounded-3xl m-8 ">
     <DeviceMockup >
