@@ -77,13 +77,13 @@
 
   // --- DAFTAR API BAPAS ---
   const BAPAS_LIST = [
-    { name: 'Bapas Jember', url: 'https://bapasjember.aksara.cloud' },
-    { name: 'Bapas Surabaya', url: 'https://bapassurabaya.aksara.cloud' },
-    { name: 'Bapas Malang', url: 'https://bapasmalang.aksara.cloud' },
-    { name: 'Bapas Madiun', url: 'https://bapasmadiun.aksara.cloud' },
-    { name: 'Bapas Bojonegoro', url: 'https://bapasbojonegoro.aksara.cloud' },
-    { name: 'Bapas Kediri', url: 'https://bapaskediri.aksara.cloud' },
-    { name: 'Bapas Pamekasan', url: 'https://bapaspamekasan.aksara.cloud' },
+    { name: 'Bapas Jember', url: 'https://bapasjember.somasi.cloud' },
+    { name: 'Bapas Surabaya', url: 'https://bapassurabaya.somasi.cloud' },
+    { name: 'Bapas Malang', url: 'https://bapasmalang.somasi.cloud' },
+    { name: 'Bapas Madiun', url: 'https://bapasmadiun.somasi.cloud' },
+    { name: 'Bapas Bojonegoro', url: 'https://bapasbojonegoro.somasi.cloud' },
+    { name: 'Bapas Kediri', url: 'https://bapaskediri.somasi.cloud' },
+    { name: 'Bapas Pamekasan', url: 'https://bapaspamekasan.somasi.cloud' },
   ];
 
   // --- Palet Warna untuk Setiap Bapas ---
