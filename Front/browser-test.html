@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browser Compatibility Test - SomasiKanwil</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+        }
+        .pass {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .fail {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #results {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Browser Compatibility Test</h1>
+    <p>This page tests your browser's compatibility with the SomasiKanwil application.</p>
+    
+    <button onclick="runTests()">Run Compatibility Tests</button>
+    <button onclick="testAPIConnections()">Test API Connections</button>
+    <button onclick="testWebSocket()">Test WebSocket Connection</button>
+    
+    <div id="results"></div>
+    
+    <script>
+        function runTests() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<h2>Test Results</h2>';
+            
+            // Test basic browser features
+            const tests = [
+                {
+                    name: 'Fetch API',
+                    test: () => 'fetch' in window,
+                    critical: true
+                },
+                {
+                    name: 'Promise Support',
+                    test: () => 'Promise' in window,
+                    critical: true
+                },
+                {
+                    name: 'LocalStorage',
+                    test: () => {
+                        try {
+                            localStorage.setItem('test', 'test');
+                            localStorage.removeItem('test');
+                            return true;
+                        } catch (e) {
+                            return false;
+                        }
+                    },
+                    critical: true
+                },
+                {
+                    name: 'SessionStorage',
+                    test: () => {
+                        try {
+                            sessionStorage.setItem('test', 'test');
+                            sessionStorage.removeItem('test');
+                            return true;
+                        } catch (e) {
+                            return false;
+                        }
+                    },
+                    critical: true
+                },
+                {
+                    name: 'WebSocket Support',
+                    test: () => 'WebSocket' in window,
+                    critical: false
+                },
+                {
+                    name: 'CORS Support',
+                    test: () => 'XMLHttpRequest' in window && 'withCredentials' in new XMLHttpRequest(),
+                    critical: true
+                },
+                {
+                    name: 'ES6 Features',
+                    test: () => {
+                        try {
+                            eval('const test = () => {}; const obj = {test}; const {test: test2} = obj;');
+                            return true;
+                        } catch (e) {
+                            return false;
+                        }
+                    },
+                    critical: true
+                },
+                {
+                    name: 'Canvas Support',
+                    test: () => {
+                        const canvas = document.createElement('canvas');
+                        return !!(canvas.getContext && canvas.getContext('2d'));
+                    },
+                    critical: false
+                }
+            ];
+            
+            let allCriticalPassed = true;
+            
+            tests.forEach(test => {
+                const resultDiv = document.createElement('div');
+                resultDiv.className = 'test-result';
+                
+                try {
+                    const passed = test.test();
+                    if (passed) {
+                        resultDiv.className += ' pass';
+                        resultDiv.textContent = `✓ ${test.name}: Supported`;
+                    } else {
+                        resultDiv.className += test.critical ? ' fail' : ' warning';
+                        resultDiv.textContent = `✗ ${test.name}: ${test.critical ? 'Not Supported (Critical)' : 'Not Supported'}`;
+                        if (test.critical) allCriticalPassed = false;
+                    }
+                } catch (e) {
+                    resultDiv.className += ' fail';
+                    resultDiv.textContent = `✗ ${test.name}: Error - ${e.message}`;
+                    if (test.critical) allCriticalPassed = false;
+                }
+                
+                results.appendChild(resultDiv);
+            });
+            
+            // Overall result
+            const overallDiv = document.createElement('div');
+            overallDiv.className = `test-result ${allCriticalPassed ? 'pass' : 'fail'}`;
+            overallDiv.innerHTML = `<strong>Overall Result: ${allCriticalPassed ? 'Compatible' : 'Not Fully Compatible'}</strong>`;
+            results.appendChild(overallDiv);
+            
+            // Browser info
+            const browserInfo = document.createElement('div');
+            browserInfo.className = 'test-result';
+            browserInfo.innerHTML = `
+                <h3>Browser Information</h3>
+                <p>User Agent: ${navigator.userAgent}</p>
+                <p>Platform: ${navigator.platform}</p>
+                <p>Language: ${navigator.language}</p>
+                <p>Online: ${navigator.onLine ? 'Yes' : 'No'}</p>
+            `;
+            results.appendChild(browserInfo);
+        }
+        
+        function testAPIConnections() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<h2>API Connection Tests</h2>';
+            
+            // Test local API
+            const localAPITest = document.createElement('div');
+            localAPITest.className = 'test-result';
+            localAPITest.innerHTML = 'Testing local API connection...';
+            results.appendChild(localAPITest);
+            
+            fetch('/api/config', {
+                cache: 'no-cache',
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    localAPITest.className = 'test-result pass';
+                    localAPITest.textContent = '✓ Local API: Connected successfully';
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            })
+            .catch(error => {
+                localAPITest.className = 'test-result fail';
+                localAPITest.textContent = `✗ Local API: Failed - ${error.message}`;
+            });
+            
+            // Test external BAPAS APIs
+            const bapasList = [
+                { name: 'Bapas Jember', url: 'https://bapasjember.somasi.cloud' },
+                { name: 'Bapas Surabaya', url: 'https://bapassurabaya.somasi.cloud' }
+            ];
+            
+            bapasList.forEach(bapas => {
+                const testDiv = document.createElement('div');
+                testDiv.className = 'test-result';
+                testDiv.innerHTML = `Testing ${bapas.name} API...`;
+                results.appendChild(testDiv);
+                
+                // Create a test request with timeout
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                
+                fetch(`${bapas.url}/api/dashboard`, {
+                    mode: 'cors',
+                    signal: controller.signal
+                })
+                .then(response => {
+                    clearTimeout(timeoutId);
+                    if (response.ok) {
+                        testDiv.className = 'test-result pass';
+                        testDiv.textContent = `✓ ${bapas.name}: Connected successfully`;
+                    } else {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                })
+                .catch(error => {
+                    clearTimeout(timeoutId);
+                    testDiv.className = 'test-result warning';
+                    testDiv.textContent = `⚠ ${bapas.name}: Failed - ${error.message}`;
+                });
+            });
+        }
+        
+        function testWebSocket() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<h2>WebSocket Connection Test</h2>';
+            
+            const testDiv = document.createElement('div');
+            testDiv.className = 'test-result';
+            testDiv.innerHTML = 'Testing WebSocket connection...';
+            results.appendChild(testDiv);
+            
+            try {
+                // Test with a public WebSocket echo server
+                const socket = new WebSocket('wss://echo.websocket.org');
+                
+                const timeout = setTimeout(() => {
+                    testDiv.className = 'test-result fail';
+                    testDiv.textContent = '✗ WebSocket: Connection timeout';
+                    socket.close();
+                }, 5000);
+                
+                socket.onopen = () => {
+                    clearTimeout(timeout);
+                    testDiv.className = 'test-result pass';
+                    testDiv.textContent = '✓ WebSocket: Connection successful';
+                    socket.close();
+                };
+                
+                socket.onerror = (error) => {
+                    clearTimeout(timeout);
+                    testDiv.className = 'test-result fail';
+                    testDiv.textContent = `✗ WebSocket: Connection failed`;
+                };
+            } catch (error) {
+                testDiv.className = 'test-result fail';
+                testDiv.textContent = `✗ WebSocket: Error - ${error.message}`;
+            }
+        }
+        
+        // Run tests automatically when page loads
+        window.onload = () => {
+            runTests();
+        };
+    </script>
+</body>
+</html>

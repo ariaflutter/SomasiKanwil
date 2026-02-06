@@ -4,9 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port 8080",
+    "dev": "vite --port 8080 --host",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:browser": "vite --port 8080 --host --mode development",
+    "build:prod": "vite build --mode production"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^4.0.0",

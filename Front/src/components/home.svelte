@@ -34,11 +34,35 @@
    let beholdData = [];
   let instanceName = 'Bapas Jawa Timur'; // Deklarasi variabel dengan nilai default
 
+  // Browser compatibility check
+  function checkBrowserCompatibility() {
+    const isCompatible = 'fetch' in window &&
+                         'Promise' in window &&
+                         'localStorage' in window &&
+                         'sessionStorage' in window;
+    
+    if (!isCompatible) {
+      console.error("Browser Anda tidak kompatibel dengan beberapa fitur aplikasi. Silakan gunakan browser modern.");
+      return false;
+    }
+    return true;
+  }
+
   // Menggabungkan semua proses fetch data awal ke dalam satu onMount
   onMount(async () => {
+    if (!checkBrowserCompatibility()) {
+      error = "Browser Anda tidak sepenuhnya kompatibel. Beberapa fitur mungkin tidak berfungsi dengan baik.";
+    }
+
     // --- Fetch data berita ---
     try {
-      const response = await fetch(`/api/behold-data`);
+      const response = await fetch(`/api/behold-data`, {
+        cache: 'no-cache',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
       if (!response.ok) throw new Error("Gagal mengambil data berita");
       
       const data = await response.json();
@@ -51,7 +75,13 @@
 
     // --- Fetch data konfigurasi (instanceName) ---
     try {
-      const response = await fetch(`/api/config`);
+      const response = await fetch(`/api/config`, {
+        cache: 'no-cache',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
       if (!response.ok) {
         throw new Error(`Gagal mengambil data config: ${response.statusText}`);
       }
@@ -108,13 +138,13 @@
   let connectionStatus = "Menyambungkan...";
   let lastNotification: any = null;
   let currentTime = new Date();
-  let timer: NodeJS.Timeout;
+  let timer: any;
   let bapasStatus: { name: string, status: 'Online' | 'Offline' | 'Loading' }[] = BAPAS_LIST.map(b => ({ name: b.name, status: 'Loading' }));
   let autoScroll = false;
 
   // --- STATE PETA ---
-  let map: L.Map;
-  let mapMarkers: L.Marker[] = [];
+  let map: any;
+  let mapMarkers: any[] = [];
   // --- PERUBAHAN: Menggunakan state terpisah untuk bulan dan tahun ---
   let selectedMonth: number = new Date().getMonth(); // 0 for January, 11 for December
   let selectedYear: number = new Date().getFullYear();
@@ -171,7 +201,14 @@
   
   async function fetchAndAggregateAllData() {
     const fetchPromises = BAPAS_LIST.map(bapas =>
-        fetch(`${bapas.url}/api/dashboard`)
+        fetch(`${bapas.url}/api/dashboard`, {
+            mode: 'cors',
+            credentials: 'omit',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        })
             .then(response => {
                 if (!response.ok) throw new Error(`Gagal memuat dari ${bapas.name}`);
                 return response.json();
@@ -196,7 +233,7 @@
     
     const newBapasStatus = results.map(result => {
         if (result.status === 'fulfilled') {
-            const data = result.value;
+            const data = (result as any).value;
             Object.entries(aggregatedStats).forEach(([key]) => {
                 aggregatedStats[key as keyof typeof aggregatedStats] += Number(data.summary?.[key]) || 0;
             });
@@ -256,10 +293,16 @@
         processDataForDailyReportsChart(data.finalLaporanHarian);
     } catch (e: any) {
         error = "Terjadi kesalahan saat mengambil data gabungan: " + e.message;
+        console.error("Dashboard fetch error:", e);
+        
+        // Fallback for critical errors
+        if (e.message.includes('Failed to fetch') || e.message.includes('NetworkError')) {
+            error += " Pastikan koneksi internet stabil dan coba refresh halaman.";
+        }
     } finally {
         loading = false;
     }
-}
+  }
 
   // --- FUNGSI PETA YANG DIMODIFIKASI ---
 
@@ -289,7 +332,14 @@
       const dateForDay = new Date(year, month, day);
       const dateString = formatApiDate(dateForDay);
       const dailyPromises = BAPAS_LIST.map(bapas =>
-        fetch(`${bapas.url}/api/search-wajib-lapor-by-date?date=${dateString}`)
+        fetch(`${bapas.url}/api/search-wajib-lapor-by-date?date=${dateString}`, {
+            mode: 'cors',
+            credentials: 'omit',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        })
           .then(res => res.ok ? res.json() : [])
           .then(data => data.map(item => ({ ...item, namaBapas: bapas.name, bapasUrl: bapas.url })))
           .catch(err => {
@@ -303,8 +353,8 @@
     const results = await Promise.allSettled(allFetchPromises);
     
     const successfulResults = results
-      .filter(result => result.status === 'fulfilled' && result.value.length > 0)
-      .map(result => result.value);
+      .filter(result => result.status === 'fulfilled' && (result as any).value.length > 0)
+      .map(result => (result as any).value);
     const combinedData = successfulResults.flat();
 
     console.log(`[PETA] Total data gabungan yang diterima untuk bulan ini: ${combinedData.length} item.`);
@@ -352,7 +402,7 @@
       const popupContent = `<div style="font-family: sans-serif; font-size: 14px; max-width: 250px;"><strong style="font-size: 16px;">${item.Nama}</strong><em style="display: block; font-size: 12px; color: #555;">(${item.namaBapas})</em><hr style="margin: 4px 0;"><strong>Alamat:</strong> ${item.Alamat}<br><strong>Pasal:</strong> ${item.Pasal}<br><strong>Nama PK:</strong> ${item.NamaPK}<br><a href="${fullPhotoPath}" target="_blank" rel="noopener noreferrer"><img src="${fullPhotoPath}" alt="Foto Wajib Lapor" style="width: 100%; height: auto; margin-top: 8px; border-radius: 4px;"></a></div>`;
       marker.bindPopup(popupContent);
       return marker;
-    }).filter(marker => marker !== null) as L.Marker[];
+    }).filter(marker => marker !== null);
     
     console.log(`[PETA] Ringkasan Koordinat: ${validCoordsCount} valid, ${invalidCoordsCount} tidak valid.`);
     console.log(`[PETA] Jumlah marker yang akan ditambahkan ke peta: ${mapMarkers.length}`);
@@ -370,16 +420,16 @@
     fetchLocationsForMap(selectedMonth, selectedYear);
   }
 
-  onMount(async () => {
-    await fetchDashboardData();
-
-    if (!error) {
-      if (lineCanvas) lineChartInstance = new Chart(lineCanvas, { type: 'line', data: lineChartData, options: lineChartOptions });
-      if (monthlyTrendsCanvas) monthlyTrendsInstance = new Chart(monthlyTrendsCanvas, { type: 'bar', data: monthlyTrendsData, options: barChartOptions });
-      if (dailyReportsCanvas) dailyReportsInstance = new Chart(dailyReportsCanvas, { type: 'bar', data: dailyReportsData, options: dailyReportsOptions });
-    }
+  onMount(() => {
+    fetchDashboardData().then(() => {
+      if (!error) {
+        if (lineCanvas) lineChartInstance = new Chart(lineCanvas, { type: 'line', data: lineChartData, options: lineChartOptions });
+        if (monthlyTrendsCanvas) monthlyTrendsInstance = new Chart(monthlyTrendsCanvas, { type: 'bar', data: monthlyTrendsData, options: barChartOptions });
+        if (dailyReportsCanvas) dailyReportsInstance = new Chart(dailyReportsCanvas, { type: 'bar', data: dailyReportsData, options: dailyReportsOptions });
+      }
+    });
     
-    setTimeout(async () => {
+    setTimeout(() => {
       if (document.getElementById('map') && !map) {
         // Initialize map with full viewport height
         map = L.map("map").setView([-7.5666, 112.7521], 7.5);
@@ -410,13 +460,17 @@
         legend.addTo(map);
 
         // --- PERUBAHAN: Panggilan awal menggunakan state bulan/tahun ---
-        await fetchLocationsForMap(selectedMonth, selectedYear);
+        fetchLocationsForMap(selectedMonth, selectedYear);
       }
     }, 500); // Increased timeout to ensure DOM is fully rendered
     
     timer = setInterval(() => { currentTime = new Date(); }, 1000);
     const sockets = BAPAS_LIST.map(bapas => {
-        const socket = io(bapas.url, { transports: ["websocket"] });
+        const socket = io(bapas.url, {
+            transports: ["websocket", "polling"],
+            timeout: 20000,
+            forceNew: true
+        });
         socket.on("connect", () => console.log(`Connected to Socket.IO at ${bapas.name}`));
         socket.on("disconnect", () => console.log(`Disconnected from Socket.IO at ${bapas.name}`));
         socket.on("laporan_baru", async (laporanBaru) => {
@@ -442,7 +496,6 @@
         });
         return socket;
     });
-
 
     return () => {
       lineChartInstance?.destroy();
