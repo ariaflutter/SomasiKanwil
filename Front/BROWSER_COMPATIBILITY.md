@@ -41,13 +41,18 @@ This document provides information about browser compatibility issues and soluti
 - Increased timeout values
 - Added proper error handling and reconnection logic
 
-### 4. Map Initialization
-**Problem**: Leaflet map may not initialize properly in some browsers.
+### 4. Map Initialization and Pin Display
+**Problem**: Leaflet map may not initialize properly or pins may not display in some browsers due to race conditions.
 
 **Solution**:
-- Increased initialization timeout to 500ms
-- Added proper DOM element checks
-- Improved error handling for map creation
+- Increased initialization timeout to 1000ms for better cross-browser compatibility
+- Added proper DOM element checks before map initialization
+- Implemented sequential marker processing to avoid race conditions
+- Added tile layer load event to ensure map is ready before adding markers
+- Added fallback mechanism if tile load event doesn't fire
+- Implemented proper error handling for marker creation and addition
+- Added map bounds fitting to ensure all markers are visible
+- Improved clearMapMarkers function with proper layer checks
 
 ## Testing Your Browser
 
@@ -74,14 +79,28 @@ This document provides information about browser compatibility issues and soluti
 5. Disable browser extensions temporarily
 6. Check network connection and firewall settings
 
-### If Map Doesn't Load:
+### If Map Doesn't Load or Pins Don't Show:
 1. Check if JavaScript is enabled
 2. Verify network connectivity to OpenStreetMap tiles
-3. Check browser console for map-related errors
+3. Check browser console for map-related errors (look for "[PETA]" prefixed messages)
 4. Try zooming in/out to trigger tile loading
+5. Wait a few seconds after page load for markers to appear (there's a 2-second fallback)
+6. Check if there are any network errors in the console related to BAPAS servers
+7. Try changing the month/year filter to trigger a refresh of the markers
+8. Clear browser cache and reload the page
+
+### If Charts Don't Display Data:
+1. Check browser console for "[CHART]" prefixed messages
+2. Verify the canvas elements are present in the DOM
+3. Check if data is being fetched from the API endpoints (look for "[DASHBOARD]" messages)
+4. Try refreshing the page to reload data
+5. Check if there are any JavaScript errors in the console
+6. Verify the data processing functions are working correctly
+7. Check if reactive statements are triggering when data changes
+8. Ensure Socket.IO connections are established for real-time updates
 
 ### If Real-time Updates Don't Work:
-1. Check WebSocket connection status in browser console
+1. Check WebSocket connection status in browser console (look for "[SOCKET]" messages)
 2. Verify network allows WebSocket connections
 3. Check if browser is in private/incognito mode (some restrict WebSockets)
 4. Try refreshing the page

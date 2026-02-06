@@ -170,33 +170,99 @@
   let dailyReportsData: any = null;
 
   function processDataForCharts(data: any[]) {
-    if (!data || data.length === 0) return;
+    console.log("[CHART] Processing chart data with", data?.length || 0, "items");
+    
+    if (!data || data.length === 0) {
+      console.warn("[CHART] No data available for charts");
+      lineChartData = { labels: ['No Data'], datasets: [{ label: 'No Data Available', data: [0], borderColor: 'rgb(59, 130, 246)', backgroundColor: 'rgba(59, 130, 246, 0.1)' }] };
+      monthlyTrendsData = { labels: ['No Data'], datasets: [{ label: 'No Data', data: [0], backgroundColor: 'rgba(16, 185, 129, 0.7)' }] };
+      return;
+    }
+    
     const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
     const monthlyHMB = Array(12).fill(0);
     const monthlyKlienBaru = Array(12).fill(0);
+    
     data.forEach(item => {
       const parts = item.tanggal.split('-');
       if (parts.length === 3) {
         const month = parseInt(parts[1], 10);
         if (month >= 1 && month <= 12) {
-          monthlyHMB[month - 1] += Number(item.jumlahHMB);
-          monthlyKlienBaru[month - 1] += Number(item.jumlahKlienBaru);
+          monthlyHMB[month - 1] += Number(item.jumlahHMB) || 0;
+          monthlyKlienBaru[month - 1] += Number(item.jumlahKlienBaru) || 0;
         }
       }
     });
-    lineChartData = { labels: data.map(d => d.tanggal), datasets: [{ label: 'Total Klien Dewasa', data: data.map(d => Number(d.jumlahKlienDewasa)), borderColor: 'rgb(59, 130, 246)', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, tension: 0.3, pointRadius: 0 }] };
-    monthlyTrendsData = { labels: months, datasets: [ { label: 'Jumlah HMB', data: monthlyHMB, backgroundColor: 'rgba(16, 185, 129, 0.7)', borderWidth: 1 }, { label: 'Klien Baru', data: monthlyKlienBaru, backgroundColor: 'rgba(139, 92, 246, 0.7)', borderWidth: 1 } ] };
+    
+    // Create line chart data
+    lineChartData = {
+      labels: data.map(d => d.tanggal),
+      datasets: [{
+        label: 'Total Klien Dewasa',
+        data: data.map(d => Number(d.jumlahKlienDewasa) || 0),
+        borderColor: 'rgb(59, 130, 246)',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 0
+      }]
+    };
+    
+    // Create monthly trends data
+    monthlyTrendsData = {
+      labels: months,
+      datasets: [
+        {
+          label: 'Jumlah HMB',
+          data: monthlyHMB,
+          backgroundColor: 'rgba(16, 185, 129, 0.7)',
+          borderWidth: 1
+        },
+        {
+          label: 'Klien Baru',
+          data: monthlyKlienBaru,
+          backgroundColor: 'rgba(139, 92, 246, 0.7)',
+          borderWidth: 1
+        }
+      ]
+    };
+    
+    console.log("[CHART] Line chart data created with", lineChartData.labels.length, "points");
+    console.log("[CHART] Monthly trends data created");
   }
   
   function processDataForDailyReportsChart(data: any[]) {
+    console.log("[CHART] Processing daily reports with", data?.length || 0, "items");
+    
     if (!data || data.length === 0) {
-      dailyReportsData = { labels: ['Tidak ada data'], datasets: [{ label: 'Jumlah Laporan', data: [0] }] };
+      console.warn("[CHART] No daily reports data available");
+      dailyReportsData = {
+        labels: ['Tidak ada data'],
+        datasets: [{
+          label: 'Jumlah Laporan',
+          data: [0],
+          backgroundColor: 'rgba(239, 68, 68, 0.7)',
+          borderColor: 'rgb(239, 68, 68)',
+          borderWidth: 1
+        }]
+      };
       return;
     }
+    
     dailyReportsData = {
         labels: data.map(d => d._id),
-        datasets: [{ label: 'Jumlah Laporan', data: data.map(d => d.jumlah), backgroundColor: 'rgba(239, 68, 68, 0.7)', borderColor: 'rgb(239, 68, 68)', borderWidth: 1, barThickness: 'flex', maxBarThickness: 20 }]
+        datasets: [{
+          label: 'Jumlah Laporan',
+          data: data.map(d => Number(d.jumlah) || 0),
+          backgroundColor: 'rgba(239, 68, 68, 0.7)',
+          borderColor: 'rgb(239, 68, 68)',
+          borderWidth: 1,
+          barThickness: 'flex',
+          maxBarThickness: 20
+        }]
     };
+    
+    console.log("[CHART] Daily reports data created with", dailyReportsData.labels.length, "points");
   }
   
   async function fetchAndAggregateAllData() {
@@ -284,21 +350,50 @@
     if (!loading) loading = true;
     error = "";
     try {
+        console.log("[DASHBOARD] Starting data fetch...");
         const data = await fetchAndAggregateAllData();
-        stats = data.aggregatedStats;
-        perkembangan = data.finalPerkembangan;
-        aktivitasTerbaru = data.finalAktivitas;
-        bapasStatus = data.newBapasStatus;
-        processDataForCharts(data.finalPerkembangan);
-        processDataForDailyReportsChart(data.finalLaporanHarian);
+        
+        if (!data) {
+          throw new Error("No data returned from fetchAndAggregateAllData");
+        }
+        
+        stats = data.aggregatedStats || {};
+        perkembangan = data.finalPerkembangan || [];
+        aktivitasTerbaru = data.finalAktivitas || [];
+        bapasStatus = data.newBapasStatus || [];
+        
+        console.log("[DASHBOARD] Data received:", {
+          statsKeys: Object.keys(stats),
+          perkembanganCount: perkembangan.length,
+          aktivitasCount: aktivitasTerbaru.length,
+          bapasStatusCount: bapasStatus.length
+        });
+        
+        // Process chart data with error handling
+        try {
+          processDataForCharts(perkembangan);
+          processDataForDailyReportsChart(data.finalLaporanHarian || []);
+          console.log("[DASHBOARD] Chart data processed successfully");
+        } catch (chartError) {
+          console.error("[DASHBOARD] Error processing chart data:", chartError);
+          // Create empty chart data as fallback
+          lineChartData = { labels: ['No Data'], datasets: [{ label: 'No Data', data: [0] }] };
+          monthlyTrendsData = { labels: ['No Data'], datasets: [{ label: 'No Data', data: [0] }] };
+          dailyReportsData = { labels: ['No Data'], datasets: [{ label: 'No Data', data: [0] }] };
+        }
     } catch (e: any) {
         error = "Terjadi kesalahan saat mengambil data gabungan: " + e.message;
-        console.error("Dashboard fetch error:", e);
+        console.error("[DASHBOARD] Fetch error:", e);
         
         // Fallback for critical errors
         if (e.message.includes('Failed to fetch') || e.message.includes('NetworkError')) {
             error += " Pastikan koneksi internet stabil dan coba refresh halaman.";
         }
+        
+        // Create empty chart data as fallback
+        lineChartData = { labels: ['Error'], datasets: [{ label: 'Error Loading Data', data: [0] }] };
+        monthlyTrendsData = { labels: ['Error'], datasets: [{ label: 'Error Loading Data', data: [0] }] };
+        dailyReportsData = { labels: ['Error'], datasets: [{ label: 'Error Loading Data', data: [0] }] };
     } finally {
         loading = false;
     }
@@ -314,15 +409,32 @@
     return date.toLocaleDateString("en-CA");
   }
 
-  function clearMapMarkers() { 
-    if(map) { 
-      mapMarkers.forEach(marker => marker.remove()); 
-    } 
-    mapMarkers = []; 
+  function clearMapMarkers() {
+    if(map && mapMarkers.length > 0) {
+      mapMarkers.forEach(marker => {
+        try {
+          if (marker && map.hasLayer(marker)) {
+            map.removeLayer(marker);
+          }
+        } catch (error) {
+          console.error("[PETA] Error removing marker:", error);
+        }
+      });
+    }
+    mapMarkers = [];
   }
 
   async function fetchLocationsForMap(month: number, year: number) {
     console.log(`[PETA] Memulai fetch untuk seluruh bulan: ${month + 1}/${year}`);
+    
+    // Check if map is initialized before proceeding
+    if (!map) {
+      console.error("[PETA] Map not initialized, waiting...");
+      // Retry after a short delay
+      setTimeout(() => fetchLocationsForMap(month, year), 500);
+      return;
+    }
+    
     clearMapMarkers();
 
     const daysInMonth = getDaysInMonth(year, month);
@@ -337,11 +449,24 @@
             credentials: 'omit',
             headers: {
                 'Accept': 'application/json',
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache'
             }
         })
-          .then(res => res.ok ? res.json() : [])
-          .then(data => data.map(item => ({ ...item, namaBapas: bapas.name, bapasUrl: bapas.url })))
+          .then(res => {
+            if (!res.ok) {
+              console.warn(`HTTP ${res.status} for ${bapas.name} on ${dateString}`);
+              return [];
+            }
+            return res.json();
+          })
+          .then(data => {
+            if (!Array.isArray(data)) {
+              console.warn(`Invalid data format for ${bapas.name} on ${dateString}:`, data);
+              return [];
+            }
+            return data.map(item => ({ ...item, namaBapas: bapas.name, bapasUrl: bapas.url }));
+          })
           .catch(err => {
             console.error(`Gagal fetch untuk ${bapas.name} pada ${dateString}:`, err);
             return [];
@@ -350,68 +475,96 @@
       allFetchPromises.push(...dailyPromises);
     }
 
-    const results = await Promise.allSettled(allFetchPromises);
-    
-    const successfulResults = results
-      .filter(result => result.status === 'fulfilled' && (result as any).value.length > 0)
-      .map(result => (result as any).value);
-    const combinedData = successfulResults.flat();
+    try {
+      const results = await Promise.allSettled(allFetchPromises);
+      
+      const successfulResults = results
+        .filter(result => result.status === 'fulfilled' && (result as any).value && (result as any).value.length > 0)
+        .map(result => (result as any).value);
+      const combinedData = successfulResults.flat();
 
-    console.log(`[PETA] Total data gabungan yang diterima untuk bulan ini: ${combinedData.length} item.`);
+      console.log(`[PETA] Total data gabungan yang diterima untuk bulan ini: ${combinedData.length} item.`);
 
-    if (combinedData.length === 0) {
-      console.log("[PETA] Tidak ada data untuk ditampilkan pada bulan ini, proses berhenti.");
-      return;
-    }
+      if (combinedData.length === 0) {
+        console.log("[PETA] Tidak ada data untuk ditampilkan pada bulan ini, proses berhenti.");
+        return;
+      }
 
-    let validCoordsCount = 0;
-    let invalidCoordsCount = 0;
+      let validCoordsCount = 0;
+      let invalidCoordsCount = 0;
+      const newMarkers: any[] = [];
 
-    mapMarkers = combinedData.map((item: any, index: number) => {
-      const lat = parseFloat(item.latitude);
-      const lng = parseFloat(item.longitude);
+      // Process markers sequentially to avoid race conditions
+      for (let i = 0; i < combinedData.length; i++) {
+        const item = combinedData[i];
+        const lat = parseFloat(item.latitude);
+        const lng = parseFloat(item.longitude);
 
-      if (isNaN(lat) || isNaN(lng)) {
-        if (invalidCoordsCount < 5) {
-          console.error(`[PETA] KOORDINAT TIDAK VALID di item #${index}:`, { nama: item.Nama, lat_asli: item.latitude, lng_asli: item.longitude });
+        if (isNaN(lat) || isNaN(lng)) {
+          if (invalidCoordsCount < 5) {
+            console.error(`[PETA] KOORDINAT TIDAK VALID di item #${i}:`, { nama: item.Nama, lat_asli: item.latitude, lng_asli: item.longitude });
+          }
+          invalidCoordsCount++;
+          continue;
         }
-        invalidCoordsCount++;
-        return null;
+        
+        validCoordsCount++;
+        
+        const bapasName = item.namaBapas;
+        const color = BAPAS_COLORS[bapasName] || BAPAS_COLORS['Default'];
+
+        const svgIconHtml = `
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32">
+            <path fill="${color}" stroke="#FFFFFF" stroke-width="1.5" d="M12 0C7.31 0 3.5 3.81 3.5 8.5c0 5.25 8.5 15.5 8.5 15.5s8.5-10.25 8.5-15.5C20.5 3.81 16.69 0 12 0zm0 11.5a3 3 0 110-6 3 3 0 010 6z"/>
+          </svg>`;
+
+        const icon = L.divIcon({
+          html: svgIconHtml,
+          className: '',
+          iconSize: [32, 32],
+          iconAnchor: [16, 32],
+          popupAnchor: [0, -32]
+        });
+        
+        try {
+          const marker = L.marker([lat, lng], { icon });
+          const fullPhotoPath = `${item.bapasUrl}${item.photoPath}`;
+          const popupContent = `<div style="font-family: sans-serif; font-size: 14px; max-width: 250px;"><strong style="font-size: 16px;">${item.Nama}</strong><em style="display: block; font-size: 12px; color: #555;">(${item.namaBapas})</em><hr style="margin: 4px 0;"><strong>Alamat:</strong> ${item.Alamat}<br><strong>Pasal:</strong> ${item.Pasal}<br><strong>Nama PK:</strong> ${item.NamaPK}<br><a href="${fullPhotoPath}" target="_blank" rel="noopener noreferrer"><img src="${fullPhotoPath}" alt="Foto Wajib Lapor" style="width: 100%; height: auto; margin-top: 8px; border-radius: 4px;"></a></div>`;
+          marker.bindPopup(popupContent);
+          newMarkers.push(marker);
+        } catch (error) {
+          console.error(`[PETA] Error creating marker for ${item.Nama}:`, error);
+        }
       }
       
-      validCoordsCount++;
+      console.log(`[PETA] Ringkasan Koordinat: ${validCoordsCount} valid, ${invalidCoordsCount} tidak valid.`);
+      console.log(`[PETA] Jumlah marker yang akan ditambahkan ke peta: ${newMarkers.length}`);
+
+      // Add markers to map with a small delay to ensure map is ready
+      setTimeout(() => {
+        if (map && newMarkers.length > 0) {
+          newMarkers.forEach(marker => {
+            try {
+              marker.addTo(map);
+            } catch (error) {
+              console.error("[PETA] Error adding marker to map:", error);
+            }
+          });
+          mapMarkers = newMarkers;
+          console.log("[PETA] SUKSES: Semua marker telah ditambahkan ke peta.");
+          
+          // Fit map to show all markers
+          if (mapMarkers.length > 0) {
+            const group = new L.featureGroup(mapMarkers);
+            map.fitBounds(group.getBounds().pad(0.1));
+          }
+        } else {
+          console.error("[PETA] FATAL: Variabel 'map' tidak terdefinisi atau tidak ada marker saat mencoba menambahkan marker!");
+        }
+      }, 100);
       
-      const bapasName = item.namaBapas;
-      const color = BAPAS_COLORS[bapasName] || BAPAS_COLORS['Default'];
-
-      const svgIconHtml = `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32">
-          <path fill="${color}" stroke="#FFFFFF" stroke-width="1.5" d="M12 0C7.31 0 3.5 3.81 3.5 8.5c0 5.25 8.5 15.5 8.5 15.5s8.5-10.25 8.5-15.5C20.5 3.81 16.69 0 12 0zm0 11.5a3 3 0 110-6 3 3 0 010 6z"/>
-        </svg>`;
-
-      const icon = L.divIcon({
-        html: svgIconHtml,
-        className: '',
-        iconSize: [32, 32],
-        iconAnchor: [16, 32],
-        popupAnchor: [0, -32]
-      });
-      
-      const marker = L.marker([lat, lng], { icon });
-      const fullPhotoPath = `${item.bapasUrl}${item.photoPath}`; 
-      const popupContent = `<div style="font-family: sans-serif; font-size: 14px; max-width: 250px;"><strong style="font-size: 16px;">${item.Nama}</strong><em style="display: block; font-size: 12px; color: #555;">(${item.namaBapas})</em><hr style="margin: 4px 0;"><strong>Alamat:</strong> ${item.Alamat}<br><strong>Pasal:</strong> ${item.Pasal}<br><strong>Nama PK:</strong> ${item.NamaPK}<br><a href="${fullPhotoPath}" target="_blank" rel="noopener noreferrer"><img src="${fullPhotoPath}" alt="Foto Wajib Lapor" style="width: 100%; height: auto; margin-top: 8px; border-radius: 4px;"></a></div>`;
-      marker.bindPopup(popupContent);
-      return marker;
-    }).filter(marker => marker !== null);
-    
-    console.log(`[PETA] Ringkasan Koordinat: ${validCoordsCount} valid, ${invalidCoordsCount} tidak valid.`);
-    console.log(`[PETA] Jumlah marker yang akan ditambahkan ke peta: ${mapMarkers.length}`);
-
-    if (map) {
-        mapMarkers.forEach(marker => marker.addTo(map));
-        console.log("[PETA] SUKSES: Semua marker telah ditambahkan ke peta.");
-    } else {
-        console.error("[PETA] FATAL: Variabel 'map' tidak terdefinisi saat mencoba menambahkan marker!");
+    } catch (error) {
+      console.error("[PETA] Error in fetchLocationsForMap:", error);
     }
   }
 
@@ -421,48 +574,110 @@
   }
 
   onMount(() => {
+    // Initialize map first with a longer timeout to ensure DOM is ready
+    setTimeout(async () => {
+      const mapElement = document.getElementById('map');
+      if (mapElement && !map) {
+        try {
+          console.log("[PETA] Initializing map...");
+          // Initialize map with full viewport height
+          map = L.map("map", {
+            center: [-7.5666, 112.7521],
+            zoom: 7.5,
+            zoomControl: true
+          });
+          
+          // Add tile layer with error handling
+          const tileLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            maxZoom: 19,
+            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            errorTileUrl: ''
+          });
+          
+          tileLayer.addTo(map);
+          
+          // Wait for tiles to load before adding markers
+          tileLayer.on('load', () => {
+            console.log("[PETA] Map tiles loaded, fetching locations...");
+            fetchLocationsForMap(selectedMonth, selectedYear);
+          });
+          
+          // Add legend
+          const legend = L.control({ position: 'bottomright' });
+          legend.onAdd = function (map) {
+              const div = L.DomUtil.create('div', 'info legend');
+              div.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+              div.style.padding = '10px';
+              div.style.borderRadius = '5px';
+              div.style.boxShadow = '0 0 15px rgba(0,0,0,0.2)';
+              
+              let labels = ['<strong>Legenda Bapas</strong>'];
+              for (const bapasName in BAPAS_COLORS) {
+                  if (bapasName !== 'Default') {
+                    labels.push(
+                        `<div style="display: flex; align-items: center; margin-top: 5px;">
+                           <i style="background:${BAPAS_COLORS[bapasName]}; width: 18px; height: 18px; border-radius: 50%; margin-right: 8px;"></i>
+                           ${bapasName.replace('Bapas ', '')}
+                         </div>`
+                    );
+                  }
+              }
+              div.innerHTML = labels.join('');
+              return div;
+          };
+          legend.addTo(map);
+          
+          // Fallback in case tile load event doesn't fire
+          setTimeout(() => {
+            if (map && mapMarkers.length === 0) {
+              console.log("[PETA] Fallback: Fetching locations after timeout...");
+              fetchLocationsForMap(selectedMonth, selectedYear);
+            }
+          }, 2000);
+          
+        } catch (error) {
+          console.error("[PETA] Error initializing map:", error);
+          error = "Gagal memuat peta. Silakan refresh halaman.";
+        }
+      } else {
+        console.error("[PETA] Map element not found or already initialized");
+      }
+    }, 1000); // Increased timeout for better cross-browser compatibility
+    
+    // Initialize dashboard data with proper error handling
     fetchDashboardData().then(() => {
       if (!error) {
-        if (lineCanvas) lineChartInstance = new Chart(lineCanvas, { type: 'line', data: lineChartData, options: lineChartOptions });
-        if (monthlyTrendsCanvas) monthlyTrendsInstance = new Chart(monthlyTrendsCanvas, { type: 'bar', data: monthlyTrendsData, options: barChartOptions });
-        if (dailyReportsCanvas) dailyReportsInstance = new Chart(dailyReportsCanvas, { type: 'bar', data: dailyReportsData, options: dailyReportsOptions });
-      }
-    });
-    
-    setTimeout(() => {
-      if (document.getElementById('map') && !map) {
-        // Initialize map with full viewport height
-        map = L.map("map").setView([-7.5666, 112.7521], 7.5);
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
-        
-        const legend = L.control({ position: 'bottomright' });
-        legend.onAdd = function (map) {
-            const div = L.DomUtil.create('div', 'info legend');
-            div.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-            div.style.padding = '10px';
-            div.style.borderRadius = '5px';
-            div.style.boxShadow = '0 0 15px rgba(0,0,0,0.2)';
-            
-            let labels = ['<strong>Legenda Bapas</strong>'];
-            for (const bapasName in BAPAS_COLORS) {
-                if (bapasName !== 'Default') {
-                  labels.push(
-                      `<div style="display: flex; align-items: center; margin-top: 5px;">
-                         <i style="background:${BAPAS_COLORS[bapasName]}; width: 18px; height: 18px; border-radius: 50%; margin-right: 8px;"></i>
-                         ${bapasName.replace('Bapas ', '')}
-                       </div>`
-                  );
-                }
+        // Add a small delay to ensure DOM is fully rendered
+        setTimeout(() => {
+          try {
+            if (lineCanvas && lineChartData) {
+              console.log("[CHART] Initializing line chart");
+              lineChartInstance = new Chart(lineCanvas, { type: 'line', data: lineChartData, options: lineChartOptions });
+            } else {
+              console.warn("[CHART] Line canvas or data not available", { lineCanvas: !!lineCanvas, lineChartData: !!lineChartData });
             }
-            div.innerHTML = labels.join('');
-            return div;
-        };
-        legend.addTo(map);
-
-        // --- PERUBAHAN: Panggilan awal menggunakan state bulan/tahun ---
-        fetchLocationsForMap(selectedMonth, selectedYear);
+            
+            if (monthlyTrendsCanvas && monthlyTrendsData) {
+              console.log("[CHART] Initializing monthly trends chart");
+              monthlyTrendsInstance = new Chart(monthlyTrendsCanvas, { type: 'bar', data: monthlyTrendsData, options: barChartOptions });
+            } else {
+              console.warn("[CHART] Monthly trends canvas or data not available", { monthlyTrendsCanvas: !!monthlyTrendsCanvas, monthlyTrendsData: !!monthlyTrendsData });
+            }
+            
+            if (dailyReportsCanvas && dailyReportsData) {
+              console.log("[CHART] Initializing daily reports chart");
+              dailyReportsInstance = new Chart(dailyReportsCanvas, { type: 'bar', data: dailyReportsData, options: dailyReportsOptions });
+            } else {
+              console.warn("[CHART] Daily reports canvas or data not available", { dailyReportsCanvas: !!dailyReportsCanvas, dailyReportsData: !!dailyReportsData });
+            }
+          } catch (error) {
+            console.error("[CHART] Error initializing charts:", error);
+          }
+        }, 500);
       }
-    }, 500); // Increased timeout to ensure DOM is fully rendered
+    }).catch(error => {
+      console.error("[CHART] Error fetching dashboard data:", error);
+    });
     
     timer = setInterval(() => { currentTime = new Date(); }, 1000);
     const sockets = BAPAS_LIST.map(bapas => {
@@ -474,23 +689,32 @@
         socket.on("connect", () => console.log(`Connected to Socket.IO at ${bapas.name}`));
         socket.on("disconnect", () => console.log(`Disconnected from Socket.IO at ${bapas.name}`));
         socket.on("laporan_baru", async (laporanBaru) => {
+            console.log("[SOCKET] New report received from", bapas.name);
             lastNotification = { ...laporanBaru, namaBapas: bapas.name };
             setTimeout(() => (lastNotification = null), 5000);
             try {
                 const data = await fetchAndAggregateAllData();
-                stats = data.aggregatedStats;
-                perkembangan = data.finalPerkembangan;
-                aktivitasTerbaru = data.finalAktivitas;
-                bapasStatus = data.newBapasStatus;
-                processDataForCharts(data.finalPerkembangan);
-                processDataForDailyReportsChart(data.finalLaporanHarian);
+                stats = data.aggregatedStats || {};
+                perkembangan = data.finalPerkembangan || [];
+                aktivitasTerbaru = data.finalAktivitas || [];
+                bapasStatus = data.newBapasStatus || [];
+                
+                // Process chart data with error handling
+                try {
+                    processDataForCharts(perkembangan);
+                    processDataForDailyReportsChart(data.finalLaporanHarian || []);
+                    console.log("[SOCKET] Chart data updated via socket");
+                } catch (chartError) {
+                    console.error("[SOCKET] Error processing chart data:", chartError);
+                }
             } catch (e) {
-                console.error("Gagal refresh data via socket:", e);
+                console.error("[SOCKET] Failed to refresh data via socket:", e);
             }
 
             // --- PERUBAHAN: Logika refresh menggunakan state bulan/tahun ---
             const newReportDate = new Date(laporanBaru.timestamp);
             if (newReportDate.getMonth() === selectedMonth && newReportDate.getFullYear() === selectedYear) {
+                console.log("[SOCKET] Refreshing map for new report");
                 fetchLocationsForMap(selectedMonth, selectedYear);
             }
         });
@@ -507,9 +731,35 @@
     };
   });
   
-  $: if (lineChartInstance && lineChartData) { lineChartInstance.data = lineChartData; lineChartInstance.update(); }
-  $: if (monthlyTrendsInstance && monthlyTrendsData) { monthlyTrendsInstance.data = monthlyTrendsData; monthlyTrendsInstance.update(); }
-  $: if (dailyReportsInstance && dailyReportsData) { dailyReportsInstance.data = dailyReportsData; dailyReportsInstance.update(); }
+  $: if (lineChartInstance && lineChartData) {
+    try {
+      lineChartInstance.data = lineChartData;
+      lineChartInstance.update();
+      console.log("[CHART] Line chart updated");
+    } catch (error) {
+      console.error("[CHART] Error updating line chart:", error);
+    }
+  }
+  
+  $: if (monthlyTrendsInstance && monthlyTrendsData) {
+    try {
+      monthlyTrendsInstance.data = monthlyTrendsData;
+      monthlyTrendsInstance.update();
+      console.log("[CHART] Monthly trends chart updated");
+    } catch (error) {
+      console.error("[CHART] Error updating monthly trends chart:", error);
+    }
+  }
+  
+  $: if (dailyReportsInstance && dailyReportsData) {
+    try {
+      dailyReportsInstance.data = dailyReportsData;
+      dailyReportsInstance.update();
+      console.log("[CHART] Daily reports chart updated");
+    } catch (error) {
+      console.error("[CHART] Error updating daily reports chart:", error);
+    }
+  }
 
 </script>
 
