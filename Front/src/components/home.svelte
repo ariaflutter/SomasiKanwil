@@ -530,7 +530,7 @@
         <div id="test" class="h-screen lg:h-full lg:w-2/5 z-0 border-b lg:border-b-0 lg:border-l border-white/10 relative">
           <div class="h-full relative overflow-hidden bg-blue-950">
             <div class="absolute inset-0">
-              <img src="/src/assets/Kakanwil.png" alt="Kakanwil" class="w-full h-full object-cover object-top scale-110 lg:scale-125 -translate-y-4 lg:-translate-y-12 opacity-90" />
+              <img src="/Kakanwil.png" alt="Kakanwil" class="w-full h-full object-cover object-top scale-110 lg:scale-125 -translate-y-4 lg:-translate-y-12 opacity-90" />
               <div class="absolute inset-0 bg-gradient-to-t from-blue-950 via-blue-950/40 to-transparent"></div>
             </div>
               
@@ -583,7 +583,7 @@
             </div>
             
             <div class="text-center transform -skew-x-6">
-              <img src="../Logo.png" class="h-12 lg:h-20 mx-auto mb-4" alt="Logo" />
+              <img src="/Logo.png" class="h-12 lg:h-20 mx-auto mb-4" alt="Logo" />
               <h1 class="text-5xl lg:text-9xl font-black italic tracking-tighter text-white leading-none">
                 AK<span class="text-yellow-400">SARA</span>
               </h1>
@@ -618,7 +618,7 @@
               <div class="flex flex-wrap lg:flex-nowrap items-center justify-center gap-4 lg:gap-12 opacity-100 brightness-100">
                 {#each ['lg1', 'lg2', 'lg3', 'lg4', 'lg5', 'lg6', 'lg7'] as logo}
                   <img 
-                    src="/src/assets/{logo}.png" 
+                    src="/{logo}.png" 
                     alt="Network Logo {logo}" 
                     class="h-6 lg:h-10 w-auto object-contain hover:grayscale-0 hover:opacity-100 transition-all duration-300" 
                   />
