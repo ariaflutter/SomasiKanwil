@@ -103,12 +103,14 @@
   let perkembangan: any[] = [];
   let aktivitasTerbaru: any[] = [];
   let loading = true;
+  let showMapControls = false; // Add this line
   let error = "";
   let connectionStatus = "Menyambungkan...";
   let lastNotification: any = null;
   let currentTime = new Date();
   let timer: NodeJS.Timeout;
   let bapasStatus: { name: string, status: 'Online' | 'Offline' | 'Loading' }[] = BAPAS_LIST.map(b => ({ name: b.name, status: 'Loading' }));
+  let autoScroll = false;
 
   // --- STATE PETA ---
   let map: L.Map;
@@ -379,6 +381,7 @@
     
     setTimeout(async () => {
       if (document.getElementById('map') && !map) {
+        // Initialize map with full viewport height
         map = L.map("map").setView([-7.5666, 112.7521], 7.5);
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
         
@@ -409,7 +412,7 @@
         // --- PERUBAHAN: Panggilan awal menggunakan state bulan/tahun ---
         await fetchLocationsForMap(selectedMonth, selectedYear);
       }
-    }, 0);
+    }, 500); // Increased timeout to ensure DOM is fully rendered
     
     timer = setInterval(() => { currentTime = new Date(); }, 1000);
     const sockets = BAPAS_LIST.map(bapas => {
@@ -440,6 +443,7 @@
         return socket;
     });
 
+
     return () => {
       lineChartInstance?.destroy();
       monthlyTrendsInstance?.destroy();
@@ -461,12 +465,15 @@
 -->
 <div class="h-screen w-screen flex flex-col">
   <Nav />
+  
+  <!-- Vertical Scroll Indicators - Fixed Position -->
+  
 
-  <!-- Container Utama yang bisa di-scroll -->
-  <main class="flex-grow overflow-y-auto scroll-smooth">
-    <!-- SECTION 1: DASHBOARD - Now showing first -->
+  <!-- Container Utama dengan snap scrolling -->
+  <main class="flex-grow overflow-y-auto overflow-x-hidden scroll-smooth snap-y snap-mandatory">
     
-    <section class="w-full   flex flex-col p-10">
+    <!-- SECTION 1: MAP & KAKANWIL -->
+    <section id="map-section" class="h-full w-full snap-start relative p-2">
       {#if lastNotification}
         <div class="fixed top-20 right-5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-5 py-3 rounded-xl shadow-lg z-[1000] animate-bounce">
           <p class="font-bold">📢 Laporan Baru dari {lastNotification.namaBapas}!</p>
@@ -474,500 +481,372 @@
         </div>
       {/if}
 
-      <!-- Header Halaman -->
-      <header class="flex flex-wrap justify-between items-center mb-6 gap-4">
-        <div>
-          <Heading tag="h1" class="text-3xl font-extrabold text-gray-800 dark:text-white">Dashboard Analitik Kanwil</Heading>
-          <P class="text-gray-500 dark:text-gray-400 italic">Analisis data gabungan seluruh Bapas secara live.</P>
-        </div>
-        <div class="flex items-center space-x-3 bg-white dark:bg-gray-800 p-2 rounded-lg shadow-sm">
-          <div class="h-5 w-px bg-gray-300 dark:bg-gray-600"></div>
-          <p class="text-sm font-mono text-gray-900 dark:text-white tracking-tighter">
-            {currentTime.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })} | {currentTime.toLocaleTimeString('en-GB')}
-          </p>
-        </div>
-      </header>
+      <!-- TOGGLEABLE MAP CONTROLS -->
+      <div class="absolute top-4 left-4 z-20 flex flex-col gap-2">
+        <button 
+          on:click={() => showMapControls = !showMapControls}
+          class="bg-blue-600 text-white p-3 rounded-full shadow-xl hover:bg-blue-700 transition-all flex items-center justify-center border-2 border-white"
+        >
+          {#if showMapControls}
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          {:else}
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+          {/if}
+        </button>
 
-      {#if loading}
-        <div class="flex justify-center items-center h-[calc(100vh-10rem)]">
-          <Spinner size="10" color="blue" />
-          <span class="ml-4 text-lg text-gray-600 dark:text-gray-300">Menggabungkan data dari 7 Bapas...</span>
-        </div>
-      {:else if error}
-        <p class="text-red-500 text-center p-10 bg-red-50 rounded-lg">{error}</p>
-      {:else}
-        <!-- Baris 1: Kartu Statistik Utama -->
-        <section class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-          <Card class="p-4 border-l-4 border-blue-500"><h5 class="text-sm font-semibold text-blue-800">Total Klien Dewasa</h5><p class="text-4xl font-extrabold text-blue-900">{stats.jumlahKlienDewasa}</p></Card>
-          <Card class="p-4 border-l-4 border-green-500"><h5 class="text-sm font-semibold text-green-800">Total HMB Bulan Ini</h5><p class="text-4xl font-extrabold text-green-900">{stats.jumlahHMBBulanIni}</p></Card>
-          <Card class="p-4 border-l-4 border-emerald-500"><h5 class="text-sm font-semibold text-emerald-800">Total HMB Tahun Ini</h5><p class="text-4xl font-extrabold text-emerald-900">{stats.jumlahHMBTahunIni}</p></Card>
-          <Card class="p-4 border-l-4 border-purple-500"><h5 class="text-sm font-semibold text-purple-800">Total Klien Baru Thn. Ini</h5><p class="text-4xl font-extrabold text-purple-900">{stats.jumlahKlienBaruTahunIni}</p></Card>
-          <Card class="p-4 border-l-4 border-pink-500"><h5 class="text-sm font-semibold text-pink-800">Total Klien Baru Bln. Ini</h5><p class="text-4xl font-extrabold text-pink-900">{stats.jumlahKlienBaruBulanIni}</p></Card>
-        </section>
+        {#if showMapControls}
+          <div class="bg-white/95 backdrop-blur-md p-4 rounded-2xl shadow-2xl w-64 border border-blue-100 animate-fade-in-up">
+            <h3 class="text-sm font-black text-blue-900 uppercase tracking-tighter mb-3">Map Filters</h3>
+            <div class="flex flex-col gap-2">
+              <select bind:value={selectedMonth} on:change={handleMonthYearChange} class="bg-slate-50 border-none text-sm rounded-xl focus:ring-2 focus:ring-blue-500">
+                <option value="0">Januari</option>
+                <option value="1">Februari</option>
+                <option value="2">Maret</option>
+                <option value="3">April</option>
+                <option value="4">Mei</option>
+                <option value="5">Juni</option>
+                <option value="6">Juli</option>
+                <option value="7">Agustus</option>
+                <option value="8">September</option>
+                <option value="9">Oktober</option>
+                <option value="10">November</option>
+                <option value="11">Desember</option>
+              </select>
+              <select bind:value={selectedYear} on:change={handleMonthYearChange} class="bg-slate-50 border-none text-sm rounded-xl focus:ring-2 focus:ring-blue-500">
+                {#each availableYears as year}
+                  <option value={year}>{year}</option>
+                {/each}
+              </select>
+            </div>
+          </div>
+        {/if}
+      </div>
+
+      <div class="flex flex-col-reverse lg:flex-row h-full w-full">
+        <!-- MAP -->
+        <div id="map" class="h-[65%] lg:h-full lg:w-3/5 z-0"></div>
         
-        <!-- Baris 2: Status Koneksi Bapas -->
-        <section class="mb-6">
-          <h3 class="text-xl font-bold text-gray-800 dark:text-white mb-4">Status Koneksi Bapas</h3>
-          <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-            {#each bapasStatus as bapas}
-              <div class="p-4 rounded-lg text-center shadow-md"
-                  class:bg-green-100={bapas.status === 'Online'}
-                  class:dark:bg-green-900={bapas.status === 'Online'}
-                  class:bg-red-100={bapas.status === 'Offline'}
-                  class:dark:bg-red-900={bapas.status === 'Offline'}
-                  class:bg-gray-100={bapas.status === 'Loading'}
-                  class:dark:bg-gray-700={bapas.status === 'Loading'}>
-                <p class="font-semibold text-gray-800 dark:text-gray-100 truncate">{bapas.name.replace('Bapas Kelas I ', '').replace('Bapas Kelas II ', '')}</p>
-                {#if bapas.status === 'Loading'}
-                    <Spinner size="4" color="gray" class="mx-auto mt-1"/>
-                {:else}
-                    <Badge color={bapas.status === 'Online' ? 'green' : 'red'} class="mt-1">{bapas.status}</Badge>
-                {/if}
+        <!-- KAKANWIL BLUE THEME -->
+        <div id="test" class="h-screen lg:h-full lg:w-2/5 z-0 border-b lg:border-b-0 lg:border-l border-white/10 relative">
+          <div class="h-full relative overflow-hidden bg-blue-950">
+            <div class="absolute inset-0">
+              <img src="/src/assets/Kakanwil.png" alt="Kakanwil" class="w-full h-full object-cover object-top scale-110 lg:scale-125 -translate-y-4 lg:-translate-y-12 opacity-90" />
+              <div class="absolute inset-0 bg-gradient-to-t from-blue-950 via-blue-950/40 to-transparent"></div>
+            </div>
+              
+            <div class="relative h-full flex flex-col justify-end p-4 lg:p-8 text-white">
+              <div class="mb-2 lg:mb-10 transform -skew-x-12 z-10">
+                <h2 class="text-3xl lg:text-3xl font-black italic tracking-tighter leading-[0.8] mb-0 text-white">
+                  AKSA<span class="text-yellow-400">RA</span>
+                </h2>
+                <h3 class="text-[10px] lg:text-lg font-bold tracking-[0.15em] uppercase text-blue-200 mt-1">Aplikasi Kendali dan Supervisi Klien Pemasayrakatan</h3>
               </div>
-            {/each}
-          </div>
-        </section>
-        
-        <!-- Baris 3: Grid untuk 2 Grafik Utama -->
-        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <div class="bg-white p-4 rounded-xl shadow-md"><div class="h-80"><canvas bind:this={lineCanvas}></canvas></div></div>
-          <div class="bg-white p-4 rounded-xl shadow-md"><div class="h-80"><canvas bind:this={dailyReportsCanvas}></canvas></div></div>
-        </section>
-        
-        <!-- Baris 4: Peta dan Panel Kanan -->
-        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div class="lg:col-span-2 bg-white p-4 rounded-xl shadow-md">
-            <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
-                <h3 class="text-lg font-bold text-gray-700">Peta Wajib Lapor Gabungan Bulanan</h3>
-                <!-- --- PERUBAHAN: Mengganti Datepicker dengan Dropdown Bulan & Tahun --- -->
-                <div class="flex gap-2">
-                  <select bind:value={selectedMonth} on:change={handleMonthYearChange} class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-                    <option value="0">Januari</option>
-                    <option value="1">Februari</option>
-                    <option value="2">Maret</option>
-                    <option value="3">April</option>
-                    <option value="4">Mei</option>
-                    <option value="5">Juni</option>
-                    <option value="6">Juli</option>
-                    <option value="7">Agustus</option>
-                    <option value="8">September</option>
-                    <option value="9">Oktober</option>
-                    <option value="10">November</option>
-                    <option value="11">Desember</option>
-                  </select>
-                  <select bind:value={selectedYear} on:change={handleMonthYearChange} class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-                    {#each availableYears as year}
-                      <option value={year}>{year}</option>
-                    {/each}
-                  </select>
-                </div>
-            </div>
-            <div id="map" class="h-96 lg:h-[32rem] rounded-lg z-0"></div>
-          </div>
 
-          <div class="flex flex-col gap-6">
-            <div class="bg-white p-4 rounded-xl shadow-md flex-1">
-              <div class="h-64"><canvas bind:this={monthlyTrendsCanvas}></canvas></div>
-            </div>
-            <div class="bg-white p-4 rounded-xl shadow-md">
-              <h3 class="text-lg font-bold text-gray-700 mb-3">Aktivitas Terbaru (Gabungan)</h3>
-              <div class="space-y-2 max-h-48 overflow-y-auto pr-2">
-                {#if aktivitasTerbaru.length === 0}
-                  <p class="text-sm text-gray-500 italic">Belum ada aktivitas terbaru...</p>
-                {/if}
-                {#each aktivitasTerbaru as item (item.waktu + item.nama)}
-                  <div class="flex justify-between items-center text-sm p-2 rounded-lg hover:bg-gray-50">
-                    <span class="font-semibold text-gray-800 truncate" title={item.nama}>{item.nama}</span>
-                    <div class="flex items-center gap-2 flex-shrink-0">
-                      <span class="text-xs font-mono text-gray-500">{item.waktu}</span>
-                      <Badge color="blue">{item.jenis}</Badge>
-                    </div>
+              <div class="grid grid-cols-1 mb-4 lg:mb-6 relative z-10">
+                <div class="bg-blue-900/40 backdrop-blur-xl p-3 lg:p-5 border-l-4 lg:border-l-8 border-yellow-400 rounded-r-xl">
+                  <p class="text-[10px] lg:text-sm font-bold uppercase italic text-white leading-tight">
+                    "Pushing the limits of <span class="text-yellow-400">Digital Governance</span>."
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex items-end justify-between border-t border-white/20 pt-3 lg:pt-6">
+                <div class="flex gap-4">
+                  <div>
+                    <p class="text-[8px] lg:text-[10px] text-blue-400 font-black uppercase">Nodes</p>
+                    <p class="text-xs lg:text-sm font-black italic text-white">ACTIVE</p>
                   </div>
+                </div>
+                <div class="text-right leading-none opacity-20">
+                  <p class="text-sm lg:text-2xl font-black text-white italic">JAWA TIMUR</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 2: HORIZONTAL SCROLL CONTENT - RESPONSIVE OPTIMIZED -->
+    <section id="aksara-section" class="h-full w-full snap-start overflow-hidden">
+      <div class="h-full w-full flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory scroll-smooth" id="horizontal-scroll" on:mouseenter={() => autoScroll = false} on:mouseleave={() => autoScroll = true}>
+        
+        <!-- SLIDE 1: HERO (SHRUNK FOR MOBILE) -->
+        <div class="min-w-full h-full snap-center flex-shrink-0 relative bg-blue-950 overflow-hidden">
+          <div class="absolute inset-0 opacity-10">
+            <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop')] bg-cover bg-center"></div>
+          </div>
+          <div class="relative z-10 h-full flex flex-col justify-center items-center px-4">
+            <!-- Shrunk Watermark -->
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-5 select-none pointer-events-none">
+              <h2 class="text-[8rem] lg:text-[25rem] font-black italic tracking-tighter text-white">AKSR</h2>
+            </div>
+            
+            <div class="text-center transform -skew-x-6">
+              <img src="../Logo.png" class="h-12 lg:h-20 mx-auto mb-4" alt="Logo" />
+              <h1 class="text-5xl lg:text-9xl font-black italic tracking-tighter text-white leading-none">
+                AK<span class="text-yellow-400">SARA</span>
+              </h1>
+              <p class="text-[10px] lg:text-2xl font-bold tracking-[0.2em] uppercase text-cyan-400 mb-6">High Performance Control</p>
+              
+              <div class="flex flex-col md:flex-row gap-3 justify-center">
+                <button on:click={() => scrollTo('#dashboard-section')} class="px-6 py-3 bg-yellow-400 text-blue-950 font-black italic text-xs lg:text-xl uppercase transform skew-x-[-12deg]">Launch Analytics</button>
+              </div>
+            </div>
+
+            <!-- Stats grid: Better mobile fit -->
+            <div class="absolute bottom-10 w-full max-w-lg grid grid-cols-2 gap-1 px-4">
+              {#each [{l: 'Nodes', v: BAPAS_LIST.length}, {l: 'Clients', v: stats.jumlahKlienDewasa || 0}] as stat}
+                <div class="bg-blue-900/50 backdrop-blur-md p-3 border-l-2 border-cyan-500">
+                  <p class="text-[8px] font-black uppercase text-cyan-400">{stat.l}</p>
+                  <p class="text-sm font-black text-white italic">{stat.v}</p>
+                </div>
+              {/each}
+            </div>
+          </div>
+        </div>
+
+        <!-- SLIDE 2: REGIONAL NODES (SPONSOR/LOGO WALL STYLE) -->
+        <div class="min-w-full h-full snap-center flex-shrink-0 bg-slate-950 p-4 lg:p-8 flex flex-col justify-start relative overflow-hidden">
+          
+          <!-- TOP LOGO STRIP (Racing Sponsor Style) -->
+          <div class="w-full pt-2 pb-6 lg:pb-10 border-b border-white/5">
+            <div class="max-w-7xl mx-auto">
+              <p class="text-[8px] lg:text-[10px] font-black text-slate-500 uppercase tracking-[0.5em] text-center mb-4 lg:mb-6">Integrated Network Partners</p>
+              
+              <!-- Logos Container: Flex wrap for mobile, single row for desktop -->
+              <div class="flex flex-wrap lg:flex-nowrap items-center justify-center gap-4 lg:gap-12 opacity-100 brightness-100">
+                {#each ['lg1', 'lg2', 'lg3', 'lg4', 'lg5', 'lg6', 'lg7'] as logo}
+                  <img 
+                    src="/src/assets/{logo}.png" 
+                    alt="Network Logo {logo}" 
+                    class="h-6 lg:h-10 w-auto object-contain hover:grayscale-0 hover:opacity-100 transition-all duration-300" 
+                  />
                 {/each}
               </div>
             </div>
           </div>
+
+          <!-- MAIN CONTENT LAYER -->
+          <div class="w-full max-w-7xl mx-auto mt-6 lg:mt-10 relative z-10 flex-grow">
+            <div class="mb-4 lg:mb-12 flex items-end justify-between border-b-2 lg:border-b-4 border-blue-600 pb-2 lg:pb-4">
+              <div class="transform -skew-x-12">
+                <h2 class="text-3xl lg:text-6xl font-black italic tracking-tighter text-white uppercase leading-none">
+                  Regional <span class="text-yellow-400">Nodes</span>
+                </h2>
+                <div class="flex items-center gap-2 mt-1">
+                    <div class="h-[2px] w-6 bg-blue-500"></div>
+                    <p class="text-[10px] lg:text-lg font-bold text-slate-400 tracking-[0.2em] uppercase">Uptime Monitor: 99.9%</p>
+                </div>
+              </div>
+              <div class="text-right hidden md:block">
+                <p class="text-4xl font-black text-white/5">STATION_MAP</p>
+              </div>
+            </div>
+
+            <!-- GRID: High-Contrast Tactical Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2 lg:gap-4 overflow-y-auto max-h-[50vh] lg:max-h-none pr-2">
+              {#each BAPAS_LIST as bapas}
+                <a 
+                  href={bapas.url} 
+                  target="_blank" 
+                  class="group relative bg-blue-900/10 backdrop-blur-md p-3 lg:p-6 border border-white/5 hover:border-yellow-400 hover:bg-blue-600/20 transition-all duration-300 transform -skew-x-6"
+                >
+                  <!-- Tactical Corner Accent -->
+                  <div class="absolute top-0 left-0 w-2 h-2 border-t border-l border-blue-500 group-hover:border-yellow-400"></div>
+                  
+                  <div class="transform skew-x-6"> <!-- Un-skewing content for legibility -->
+                    <div class="flex justify-between items-center mb-1">
+                      <p class="text-[8px] lg:text-[10px] font-black text-blue-500 group-hover:text-yellow-400 uppercase">Station</p>
+                      <div class="h-1 w-1 bg-green-500 rounded-full animate-pulse"></div>
+                    </div>
+                    <h3 class="text-[10px] lg:text-2xl font-black italic uppercase text-white group-hover:text-yellow-400 transition-colors">
+                      {bapas.name.replace('Bapas ', '')}
+                    </h3>
+                  </div>
+                </a>
+              {/each}
+            </div>
+          </div>
+
+          <!-- Large Watermark for background energy -->
+          <div class="absolute -bottom-10 -left-10 text-[12rem] font-black italic text-white/[0.02] select-none pointer-events-none">
+            NETWORK
+          </div>
+        </div>
+
+        <!-- SLIDE 3: DIRECTIVE (SHRUNK TYPOGRAPHY) -->
+        <!-- SLIDE 3: THE CORE (TACTICAL OVERHAUL) -->
+        <div class="w-full h-full snap-center flex-shrink-0 bg-slate-950 relative overflow-hidden flex items-center justify-center">
+          
+          <!-- Background: High-Tech Grid & Glow -->
+          <div class="absolute inset-0 opacity-20">
+            <div class="absolute inset-0" style="background-image: radial-gradient(circle at 2px 2px, #3b82f6 1px, transparent 0); background-size: 24px 24px;"></div>
+            <div class="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-blue-600/20 via-transparent to-red-600/10"></div>
+          </div>
+
+          <!-- Content Wrapper: Skewed & Forced Width -->
+          <div class="relative z-10 w-full max-w-full px-5 py-10 flex flex-col gap-8">
+            
+            <!-- Headline: Massive & Outlined -->
+            <div class="relative">
+              <div class="absolute -top-6 -left-2 opacity-10 select-none">
+                <span class="text-6xl font-black italic tracking-tighter text-white">SYSTEM</span>
+              </div>
+              <h2 class="text-6xl lg:text-9xl font-black italic tracking-tighter text-white leading-none transform -skew-x-12">
+                THE <span class="text-transparent" style="-webkit-text-stroke: 1px #fbbf24;">CORE</span>
+              </h2>
+              <div class="flex items-center gap-2 mt-2">
+                <div class="h-[2px] w-12 bg-yellow-400"></div>
+                <p class="text-[10px] lg:text-xl font-black uppercase tracking-[0.3em] text-cyan-400">Tactical Control Layer</p>
+              </div>
+            </div>
+
+            <!-- Info Grid: Slanted Tactical Cards -->
+            <div class="grid grid-cols-1 gap-3 w-full">
+              
+              <!-- Card 1 -->
+              <div class="relative group transform hover:scale-[1.02] transition-transform">
+                <div class="absolute inset-0 bg-blue-600 transform -skew-x-12 translate-x-1"></div>
+                <div class="relative bg-blue-950 p-4 border-l-4 border-yellow-400 transform -skew-x-12">
+                  <div class="transform skew-x-12"> <!-- Un-skew text so it stays readable -->
+                    <div class="flex justify-between items-start">
+                      <h4 class="text-xs font-black italic text-yellow-400">REAL-TIME TRACKING</h4>
+                      <span class="text-[8px] font-mono text-blue-400">01//SYNC</span>
+                    </div>
+                    <p class="text-[10px] text-white font-bold leading-tight mt-1 opacity-80 uppercase">
+                      Kontrol Lokasi dan Keberadaan Klien Pemasyarakatan Secara Langsung
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card 2 -->
+              <div class="relative group transform hover:scale-[1.02] transition-transform">
+                <div class="absolute inset-0 bg-red-600 transform -skew-x-12 translate-x-1"></div>
+                <div class="relative bg-slate-900 p-4 border-l-4 border-white transform -skew-x-12">
+                  <div class="transform skew-x-12">
+                    <div class="flex justify-between items-start">
+                      <h4 class="text-xs font-black italic text-white">ENCRYPTION SHIELD</h4>
+                      <span class="text-[8px] font-mono text-red-500">02//SEC</span>
+                    </div>
+                    <p class="text-[10px] text-white font-bold leading-tight mt-1 opacity-80 uppercase">
+                      Sistem Administrasi Terintegrasi Jaringan Kantor Wilayah Kementerian Imigrasi dan Pemasyarakatan Jawa Timur
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Bottom Detail: Racing Stripe -->
+            <div class="flex items-center justify-between opacity-50">
+              <div class="flex gap-1">
+                <div class="h-1 w-8 bg-yellow-400"></div>
+                <div class="h-1 w-2 bg-red-600"></div>
+                <div class="h-1 w-2 bg-white"></div>
+              </div>
+              <p class="text-[8px] font-black tracking-widest text-slate-500 uppercase">Aksara Backbone v.4.0</p>
+            </div>
+
+          </div>
+          
+          <!-- Large Background Detail -->
+          <div class="absolute -bottom-10 -right-10 text-[15rem] font-black italic text-white/[0.03] select-none pointer-events-none">
+            AKSR
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 3: DASHBOARD ANALYTICS (CLEANED UP) -->
+    <section id="dashboard-section" class="w-full flex flex-col p-4 lg:p-6 snap-start">
+      <header class="flex flex-wrap justify-between items-center mb-6 gap-4 border-b border-slate-200 pb-4">
+        <Heading tag="h1" class="text-xl lg:text-2xl font-black uppercase italic text-blue-950">Analytics Center</Heading>
+        <div class="bg-slate-100 p-2 rounded-lg"><p class="text-[10px] font-mono">{currentTime.toLocaleTimeString()}</p></div>
+      </header>
+
+      {#if loading}
+        <div class="flex flex-col items-center justify-center h-64"><Spinner size="8" color="blue" /><p class="mt-4 text-xs font-black uppercase">Intercepting Data...</p></div>
+      {:else}
+        <!-- Stats -->
+        <section class="grid grid-cols-2 lg:grid-cols-5 gap-2 mb-4">
+          {#each [{l: 'Total Clients', v: stats.jumlahKlienDewasa, c: 'blue'}, {l: 'HMB Month', v: stats.jumlahHMBBulanIni, c: 'green'}, {l: 'HMB Year', v: stats.jumlahHMBTahunIni, c: 'emerald'}, {l: 'New Year', v: stats.jumlahKlienBaruTahunIni, c: 'purple'}, {l: 'New Month', v: stats.jumlahKlienBaruBulanIni, c: 'pink'}] as card}
+            <div class="bg-white p-3 border-l-4 border-{card.c}-500 shadow-sm">
+              <h5 class="text-[8px] font-black uppercase text-slate-500">{card.l}</h5>
+              <p class="text-xl font-black italic text-slate-900">{card.v}</p>
+            </div>
+          {/each}
+        </section>
+
+        <!-- Charts -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+          <div class="bg-white p-2 rounded-xl shadow-sm h-64"><canvas bind:this={lineCanvas}></canvas></div>
+          <div class="bg-white p-2 rounded-xl shadow-sm h-64"><canvas bind:this={dailyReportsCanvas}></canvas></div>
         </section>
       {/if}
-
     </section>
-    
-    <!-- SECTION 2: HERO IMAGE - Now moved after dashboard -->
-    <section
-      id="hero"
-      class="h-[90vh] w-full relative flex items-center justify-center snap-start overflow-hidden"
-    >
-      <!-- Background dengan pattern aksara Indonesia -->
-      <div
-        class="absolute inset-0 bg-cover bg-center z-0 transform scale-110"
-        style="background-image: url('https://images.unsplash.com/photo-1586953208448-b95a79798f07?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D3D&auto=format&fit=crop&w=2070&q=80');"
-      >
-        <div class="absolute inset-0 bg-gradient-to-r from-blue-900/95 via-indigo-900/90 to-purple-900/95"></div>
-        <!-- Pattern aksara overlay -->
-        <div class="absolute inset-0 opacity-10">
-          <div class="absolute inset-0" style="background-image: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC40Ij48cGF0aCBkPSJNMzYgMzR2LTRoLTJ2NGgtNHYyaDR2NGgydi00aDR2LTJoLTR6bTAtMzBWMGgtMnY0aC00djJoNHY0aDJWNmg0VjRoLTR6TTYgMzR2LTRINGg0SDB2Mmg0djRoMnYtNGg0djJINHp6TTYgNFYwSDR2NEgwdjJoNHY0aDJWNmg0VjRINGg2eiIvPjwvZz48L2c+PC9zdmc+');"></div>
-        </div>
-      </div>
-
-      <!-- Dekorasi aksara Indonesia kiri -->
-      <div class="absolute left-0 top-0 h-full w-32 md:w-64 flex items-center justify-center opacity-20">
-        <div class="text-white text-6xl md:text-8xl font-bold transform rotate-180 writing-mode-vertical">ᬓᬘᬓᬓᬭ</div>
-      </div>
-      
-      <!-- Dekorasi aksara Indonesia kanan -->
-      <div class="absolute right-0 top-0 h-full w-32 md:w-64 flex items-center justify-center opacity-20">
-        <div class="text-white text-6xl md:text-8xl font-bold writing-mode-vertical">ᬓᬘᬓᬓᬭ</div>
-      </div>
-
-      <div class="relative z-10 text-center text-white px-4 max-w-6xl mx-auto">
-        <div class="animate-fade-in-up">
-          <!-- Logo Aksara dengan animasi -->
-          <div class="mb-6 flex justify-center">
-            <div class="relative">
-              <div class="absolute inset-0 bg-white/20 rounded-full blur-xl animate-pulse"></div>
-              <img src="../Logo.png" class="relative h-20 md:h-32 animate-bounce" alt="Aksara Logo" />
-            </div>
-          </div>
-          
-          <Heading
-            tag="h1"
-            class="mb-6"
-            customSize="text-4xl md:text-5xl lg:text-7xl xl:text-8xl"
-          >
-            <Span class="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-orange-400 to-red-400 drop-shadow-lg">
-              ᬅᬓ᭄ᬱᬭ
-            </Span>
-            <br>
-            <Span class="text-gray-100 font-bold text-2xl md:text-3xl lg:text-4xl xl:text-5xl">AKSARA</Span>
-            <br>
-            <Span class="text-gray-200 font-light text-xl md:text-2xl lg:text-3xl xl:text-4xl">Aplikasi Kendali Klien Pemasyarakatan</Span>
-            <br>
-            <Span class="text-yellow-300 text-lg md:text-xl lg:text-2xl xl:text-3xl font-medium mt-4 inline-block px-6 py-2 bg-white/10 rounded-full backdrop-blur-sm">{instanceName}</Span>
-          </Heading>
-          
-          <div class="flex flex-col sm:flex-row gap-4 items-center justify-center mt-8">
-            <P class="text-lg md:text-xl font-light text-gray-200 max-w-3xl text-center">
-              Platform digital terintegrasi dengan sentuhan budaya Indonesia untuk pengawasan dan kendali klien pemasyarakatan yang modern, akuntabel, dan efisien.
-            </P>
-          </div>
-          
-          <div class="flex flex-col sm:flex-row gap-4 items-center justify-center mt-8">
-            <GradientButton color="pinkToOrange" href="/tentang" class="shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 px-8 py-4 text-lg">
-              <span class="flex items-center">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                Pelajari Lebih Lanjut
-              </span>
-              <ArrowRightOutline class="w-5 h-5 ms-2" />
-            </GradientButton>
-            
-            <GradientButton color="purpleToBlue" href="/tutorial" class="shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 px-8 py-4 text-lg">
-              <span class="flex items-center">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                Tutorial
-              </span>
-            </GradientButton>
-          </div>
-          
-          <!-- Statistik singkat -->
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-12 max-w-4xl mx-auto">
-            <div class="bg-white/10 backdrop-blur-md rounded-lg p-4">
-              <div class="text-2xl md:text-3xl font-bold text-yellow-300">{BAPAS_LIST.length}</div>
-              <div class="text-sm text-gray-200">Bapas Terhubung</div>
-            </div>
-            <div class="bg-white/10 backdrop-blur-md rounded-lg p-4">
-              <div class="text-2xl md:text-3xl font-bold text-green-300">{stats.jumlahKlienDewasa || 0}</div>
-              <div class="text-sm text-gray-200">Klien Aktif</div>
-            </div>
-            <div class="bg-white/10 backdrop-blur-md rounded-lg p-4">
-              <div class="text-2xl md:text-3xl font-bold text-blue-300">{stats.jumlahHMBBulanIni || 0}</div>
-              <div class="text-sm text-gray-200">Laporan Bulan Ini</div>
-            </div>
-            <div class="bg-white/10 backdrop-blur-md rounded-lg p-4">
-              <div class="text-2xl md:text-3xl font-bold text-purple-300">24/7</div>
-              <div class="text-sm text-gray-200">Layanan Online</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <button
-        on:click={() => scrollTo('#berita')}
-        class="absolute bottom-10 z-10 text-white animate-bounce bg-white/10 backdrop-blur-sm p-4 rounded-full hover:bg-white/20 transition-all duration-300"
-        aria-label="Scroll ke bagian berita"
-      >
-        <ChevronDownOutline size="xl" />
-      </button>
-    </section>
-
-    <!-- SECTION 3: BAPAS LIST -->
-    <section
-      id="berita"
-      class="w-full bg-gradient-to-br from-yellow-50 via-orange-50 to-red-50 dark:from-gray-900 dark:via-orange-900/20 dark:to-red-900/20 flex flex-col items-center justify-center snap-start p-4 pt-16 pb-16 relative overflow-hidden"
-    >
-      <!-- Background pattern dengan aksara -->
-      <div class="absolute inset-0 opacity-5">
-        <div class="absolute inset-0" style="background-image: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC40Ij48cGF0aCBkPSJNMzYgMzR2LTRoLTJ2NGgtNHYyaDR2NGgydi00aDR2LTJoLTR6bTAtMzBWMGgtMnY0aC00djJoNHY0aDJWNmg0VjRoLTR6TTYgMzR2LTRINGg0SDB2Mmg0djRoMnYtNGg0djJINHp6TTYgNFYwSDR2NEgwdjJoNHY0aDJWNmg0VjRINGg2eiIvPjwvZz48L2c+PC9zdmc+');"></div>
-      </div>
-      
-      <!-- Dekorasi aksara di kiri dan kanan -->
-      <div class="absolute left-0 top-1/4 text-8xl md:text-9xl text-orange-200/20 transform -rotate-12">ᬓᬘᬓ</div>
-      <div class="absolute right-0 top-1/4 text-8xl md:text-9xl text-red-200/20 transform rotate-12">ᬓᬓᬭ</div>
-      
-      <div class="container text-center max-w-screen-xl h-full flex flex-col relative z-10">
-        <div class="mb-12">
-          <h2 class="text-4xl md:text-5xl font-bold pb-4 text-gray-900 dark:text-white mb-4">
-            <span class="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 via-red-500 to-yellow-500">
-              ᬅᬓ᭄ᬱᬭ ᬩᬧᬲ᭄
-            </span>
-            <br>
-            <span class="text-3xl md:text-4xl text-gray-800 dark:text-gray-200">Aksara Bapas Jawa Timur</span>
-          </h2>
-          <p class="text-lg text-gray-600 dark:text-gray-400 max-w-3xl mx-auto">
-            Jelajahi implementasi Aksara di seluruh Balai Pemasyarakatan se-Jawa Timur dengan sentuhan budaya Indonesia untuk layanan pemasyarakatan yang lebih terintegrasi dan modern.
-          </p>
-        </div>
-        
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8 w-full">
-          <a href="https://bapasjember.aksara.cloud" target="_blank" class="group aksara-card p-8 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 hover:from-blue-100 hover:to-indigo-100 dark:hover:from-blue-800/30 dark:hover:to-indigo-800/30 transform hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl relative overflow-hidden">
-            <div class="absolute top-2 right-2 text-4xl text-blue-200/30">ᬚ᭄ᬫᬃ</div>
-            <div class="flex flex-col items-center relative z-10">
-              <div class="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
-                <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                </svg>
-              </div>
-              <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Bapas Jember</h3>
-              <p class="text-gray-600 dark:text-gray-400">Kunjungi website</p>
-              <div class="mt-2 text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                </svg>
-              </div>
-            </div>
-          </a>
-          
-          <a href="https://bapassurabaya.aksara.cloud" target="_blank" class="group aksara-card p-8 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800/30 dark:hover:to-pink-800/30 transform hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl relative overflow-hidden">
-            <div class="absolute top-2 right-2 text-4xl text-purple-200/30">ᬲᬸᬃᬩᬾ</div>
-            <div class="flex flex-col items-center relative z-10">
-              <div class="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
-                <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                </svg>
-              </div>
-              <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Bapas Surabaya</h3>
-              <p class="text-gray-600 dark:text-gray-400">Kunjungi website</p>
-              <div class="mt-2 text-purple-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                </svg>
-              </div>
-            </div>
-          </a>
-          
-          <a href="https://bapasmalang.aksara.cloud" target="_blank" class="group aksara-card p-8 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 hover:from-green-100 hover:to-emerald-100 dark:hover:from-green-800/30 dark:hover:to-emerald-800/30 transform hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl relative overflow-hidden">
-            <div class="absolute top-2 right-2 text-4xl text-green-200/30">ᬫᬮᬂ</div>
-            <div class="flex flex-col items-center relative z-10">
-              <div class="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
-                <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                </svg>
-              </div>
-              <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Bapas Malang</h3>
-              <p class="text-gray-600 dark:text-gray-400">Kunjungi website</p>
-              <div class="mt-2 text-green-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                </svg>
-              </div>
-            </div>
-          </a>
-          
-          <a href="https://bapasmadiun.aksara.cloud" target="_blank" class="group aksara-card p-8 bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 hover:from-yellow-100 hover:to-orange-100 dark:hover:from-yellow-800/30 dark:hover:to-orange-800/30 transform hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl relative overflow-hidden">
-            <div class="absolute top-2 right-2 text-4xl text-yellow-200/30">ᬫᬤᬶᬬᬦ᭄</div>
-            <div class="flex flex-col items-center relative z-10">
-              <div class="w-20 h-20 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
-                <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                </svg>
-              </div>
-              <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Bapas Madiun</h3>
-              <p class="text-gray-600 dark:text-gray-400">Kunjungi website</p>
-              <div class="mt-2 text-yellow-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                </svg>
-              </div>
-            </div>
-          </a>
-          
-          <a href="https://bapasbojonegoro.aksara.cloud" target="_blank" class="group aksara-card p-8 bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 hover:from-red-100 hover:to-rose-100 dark:hover:from-red-800/30 dark:hover:to-rose-800/30 transform hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl relative overflow-hidden">
-            <div class="absolute top-2 right-2 text-4xl text-red-200/30">ᬩᭀᬚᭀᬦᬕᬋ</div>
-            <div class="flex flex-col items-center relative z-10">
-              <div class="w-20 h-20 bg-gradient-to-br from-red-500 to-rose-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
-                <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                </svg>
-              </div>
-              <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Bapas Bojonegoro</h3>
-              <p class="text-gray-600 dark:text-gray-400">Kunjungi website</p>
-              <div class="mt-2 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                </svg>
-              </div>
-            </div>
-          </a>
-          
-          <a href="https://bapaskediri.aksara.cloud" target="_blank" class="group aksara-card p-8 bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-900/20 dark:to-blue-900/20 hover:from-indigo-100 hover:to-blue-100 dark:hover:from-indigo-800/30 dark:hover:to-blue-800/30 transform hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl relative overflow-hidden">
-            <div class="absolute top-2 right-2 text-4xl text-indigo-200/30">ᬓᭂᬤᬶᬭᬶ</div>
-            <div class="flex flex-col items-center relative z-10">
-              <div class="w-20 h-20 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
-                <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                </svg>
-              </div>
-              <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Bapas Kediri</h3>
-              <p class="text-gray-600 dark:text-gray-400">Kunjungi website</p>
-              <div class="mt-2 text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                </svg>
-              </div>
-            </div>
-          </a>
-          
-          <a href="https://bapaspamekasan.aksara.cloud" target="_blank" class="group aksara-card p-8 bg-gradient-to-br from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20 hover:from-teal-100 hover:to-cyan-100 dark:hover:from-teal-800/30 dark:hover:to-cyan-800/30 transform hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl relative overflow-hidden">
-            <div class="absolute top-2 right-2 text-4xl text-teal-200/30">ᬧᬫᬾᬓᬲᬦ᭄</div>
-            <div class="flex flex-col items-center relative z-10">
-              <div class="w-20 h-20 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
-                <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                </svg>
-              </div>
-              <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Bapas Pamekasan</h3>
-              <p class="text-gray-600 dark:text-gray-400">Kunjungi website</p>
-              <div class="mt-2 text-teal-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                </svg>
-              </div>
-            </div>
-          </a>
-        </div>
-        
-        <!-- Statistik Bapas -->
-        <div class="mt-16 grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto">
-          <div class="text-center">
-            <div class="text-3xl md:text-4xl font-bold text-orange-600 dark:text-orange-400">{BAPAS_LIST.length}</div>
-            <div class="text-sm text-gray-600 dark:text-gray-400">Total Bapas</div>
-          </div>
-          <div class="text-center">
-            <div class="text-3xl md:text-4xl font-bold text-red-600 dark:text-red-400">{bapasStatus.filter(b => b.status === 'Online').length}</div>
-            <div class="text-sm text-gray-600 dark:text-gray-400">Online</div>
-          </div>
-          <div class="text-center">
-            <div class="text-3xl md:text-4xl font-bold text-yellow-600 dark:text-yellow-400">{bapasStatus.filter(b => b.status === 'Offline').length}</div>
-            <div class="text-sm text-gray-600 dark:text-gray-400">Offline</div>
-          </div>
-          <div class="text-center">
-            <div class="text-3xl md:text-4xl font-bold text-green-600 dark:text-green-400">24/7</div>
-            <div class="text-sm text-gray-600 dark:text-gray-400">Layanan</div>
-          </div>
-        </div>
-      </div>
-    </section>
-    
-    <!-- SECTION 4: PENJELASAN -->
-    <section
-      id="penjelasan"
-      class="h-full w-full bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 dark:from-gray-800 dark:via-gray-900 dark:to-gray-800 flex items-center justify-center snap-start text-center p-8 md:p-16"
-    >
-      <div class="max-w-screen-lg animate-fade-in-up">
-        <div class="text-center mb-12">
-          <Heading
-            tag="h2"
-            class="mb-6"
-            customSize="text-3xl md:text-4xl lg:text-5xl xl:text-6xl text-gray-900 dark:text-white"
-          >
-            Apa itu
-            <Span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-500 to-cyan-400">
-              Aksara?
-            </Span>
-          </Heading>
-        </div>
-        
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-          <div class="text-left">
-            <P class="text-gray-600 dark:text-gray-300 md:text-lg leading-relaxed">
-              Aksara adalah <Span class="font-semibold text-blue-600 dark:text-blue-400">Aplikasi Kendali dan Supervisi Klien Pemasyarakatan</Span> - sebuah platform digital terpadu yang dirancang untuk mendukung reformasi birokrasi dan meningkatkan transparansi layanan di seluruh Balai Pemasyarakatan di Jawa Timur.
-            </P>
-            <P class="text-gray-600 dark:text-gray-300 md:text-lg leading-relaxed mt-4">
-              Sistem ini memberikan akses mudah terhadap informasi, program, dan data secara real-time untuk mendukung tata kelola pemasyarakatan yang modern dan akuntabel.
-            </P>
-          </div>
-          
-          <div class="grid grid-cols-2 gap-4">
-            <div class="aksara-card p-6 text-center">
-              <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-              </div>
-              <h4 class="font-semibold text-gray-800 dark:text-gray-200 mb-2">Real-time</h4>
-              <p class="text-sm text-gray-600 dark:text-gray-400">Data aktual dan terkini</p>
-            </div>
-            
-            <div class="aksara-card p-6 text-center">
-              <div class="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg class="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-                </svg>
-              </div>
-              <h4 class="font-semibold text-gray-800 dark:text-gray-200 mb-2">Aman</h4>
-              <p class="text-sm text-gray-600 dark:text-gray-400">Keamanan data terjamin</p>
-            </div>
-            
-            <div class="aksara-card p-6 text-center">
-              <div class="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg class="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                </svg>
-              </div>
-              <h4 class="font-semibold text-gray-800 dark:text-gray-200 mb-2">Cepat</h4>
-              <p class="text-sm text-gray-600 dark:text-gray-400">Akses cepat dan responsif</p>
-            </div>
-            
-            <div class="aksara-card p-6 text-center">
-              <div class="w-12 h-12 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg class="w-6 h-6 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                </svg>
-              </div>
-              <h4 class="font-semibold text-gray-800 dark:text-gray-200 mb-2">Terintegrasi</h4>
-              <p class="text-sm text-gray-600 dark:text-gray-400">Sistem terpadu lengkap</p>
-            </div>
-          </div>
-        </div>
-        
-        <div class="text-center">
-          <GradientButton color="cyanToBlue" href="/tentang" class="px-8 py-4 text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300">
-            Pelajari Lebih Lanjut
-            <ArrowRightOutline class="w-5 h-5 ms-2" />
-          </GradientButton>
-        </div>
-      </div>
-    </section>
-  </main>
+</main>
 </div>
 
 <style>
 /* Optional: Style for the legend */
 .leaflet-control.legend {
     line-height: 1.4;
+}
+
+/* Custom styles for horizontal scrolling */
+#horizontal-scroll {
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+}
+
+#horizontal-scroll::-webkit-scrollbar {
+    height: 8px;
+}
+
+#horizontal-scroll::-webkit-scrollbar-track {
+    background: rgba(229, 231, 235, 0.3);
+    border-radius: 4px;
+}
+
+#horizontal-scroll::-webkit-scrollbar-thumb {
+    background: rgba(156, 163, 175, 0.7);
+    border-radius: 4px;
+}
+
+#horizontal-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(107, 114, 128, 0.8);
+}
+
+/* Writing mode for vertical text */
+.writing-mode-vertical {
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+}
+
+/* Animation for fade in up */
+@keyframes fade-in-up {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fade-in-up {
+    animation: fade-in-up 1s ease-out;
+}
+
+/* Custom styles for Bapas cards to ensure consistent sizing */
+.aksara-card {
+    min-height: 16rem; /* h-64 equivalent */
+    display: flex;
+    flex-direction: column;
 }
 </style>
